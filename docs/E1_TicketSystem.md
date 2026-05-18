@@ -158,6 +158,22 @@ Los permisos se validan en cada endpoint del API; el rol se extrae del token de 
 
 ---
 
+## 5. Mapeo a conceptos del curso
+
+La columna **Componente del curso** es la del programa de Infraestructura en la Nube. La columna **Cómo lo ejercita el Sistema de Tickets** conecta cada componente con la funcionalidad específica del proyecto (con referencia al caso de uso o sección de §4 que la origina).
+
+| Componente del curso | Cómo lo ejercita el Sistema de Tickets |
+|---|---|
+| **Cómputo (API)** | API REST en contenedor (ECS Fargate). Endpoints principales: `POST /tickets` para crear incidente o solicitud (CU-01, CU-08), `PATCH /tickets/{id}/state` para cambio de estado y registro de resolución (CU-03), `POST /tickets/{id}/assign` para asignar agente (CU-02), `GET /tickets?filters=...` para la cola filtrada (CU-06). En cada endpoint se valida el rol extraído del token (§4.7). |
+| **Base de datos** | RDS (PostgreSQL) con tablas: `tickets` (TKT-XXXX, tipo, severidad, prioridad calculada, estado, agente asignado, reportante, timestamps UTC), `ticket_events` para el historial inmutable (§4.4, CU-05) y `sla_rules` para la configuración de SLAs por tipo/severidad (§4.3). Queries optimizadas por estado y prioridad para la cola (CU-06) y por rango de fechas para los reportes (CU-07). |
+| **Almacenamiento de archivos** | S3 para adjuntos de los tickets — capturas, logs y archivos de diagnóstico (§4.5). Los archivos viven separados de los metadatos del ticket en RDS. El acceso se hace mediante URL prefirmada con expiración, evitando enlaces permanentes no autorizados. |
+| **Procesamiento asíncrono** | SQS + worker para dos flujos: (a) envío asíncrono de notificaciones por email y Slack ante creación, asignación, cambio de estado, comentario y escalamiento — §4.6, sin bloquear la respuesta de la API; (b) job periódico que revisa tickets abiertos sin actividad y dispara el escalamiento automático L1 → L2 → L3 al vencer el SLA (§4.3, CU-04). |
+| **Red** | VPC con capa pública (ALB + API + Frontend) y capa privada (RDS, SQS, workers). Los security groups restringen el acceso a RDS exclusivamente desde la API y los workers. La capa privada no tiene egreso público directo. |
+| **Seguridad** | RBAC con tres roles — Reportante, Agente, Administrador (§4.7) — validado en cada endpoint a partir del JWT emitido por el IdP externo (§2 Actores de soporte). Los adjuntos se acceden solo mediante URL prefirmada con expiración (§4.5). El historial inmutable de eventos (§4.4) funciona como pista de auditoría de quién hizo qué y cuándo. |
+| **Observabilidad** | Métricas: tickets abiertos por severidad, % de SLA cumplidos, tiempo promedio de resolución y tasa de escalamientos por día. Logs estructurados de cada evento registrado en `ticket_events`, con autor y timestamp UTC. Alarmas: tickets críticos sin asignar superando el umbral de SLA, escalamientos a L3 por encima de un umbral en 24h, latencia P95 de la API. Soporte directo a las métricas del reporte de CU-07. |
+
+---
+
 ## Anexo IA
 
 ### Qué le pedimos a la IA
