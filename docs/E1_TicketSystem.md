@@ -174,9 +174,9 @@ La columna **Componente del curso** es la del programa de Infraestructura en la 
 
 ---
 
-## 6. Scope (in/out)
+## 6. Scope y preguntas abiertas
 
-Esta sección delimita explícitamente qué SÍ va a hacer el sistema en el alcance de los cursos y qué NO. Sirve de referencia para evitar drift de alcance en las entregas posteriores y para que el lector pueda contrastar rápidamente qué decisiones de producto fueron tomadas en esta fase.
+Esta sección delimita explícitamente qué SÍ va a hacer el sistema en el alcance de los cursos y qué NO, y reconoce las decisiones que el equipo aún tiene pendientes para entregas posteriores. Sirve de referencia para evitar drift de alcance y para ser honesto sobre los unknowns que se resolverán en D2–D5.
 
 ### Dentro del scope
 
@@ -207,6 +207,40 @@ Esta sección delimita explícitamente qué SÍ va a hacer el sistema en el alca
 - **Encuestas de satisfacción post-resolución** (CSAT/NPS). _Razón: no aporta a ejercitar los componentes del curso ni a los CUs priorizados._
 - **Frontend productivo implementado en código**. _Razón: en esta entrega se entregan únicamente mockups low-fi (ver `docs/mockups/`); la implementación del FE no es parte del alcance del curso de Infraestructura._
 
+### Preguntas abiertas
+
+Decisiones que el equipo aún no ha tomado para esta entrega; cada una indica la entrega futura en la que se cerrará.
+
+- **Motor de envío de email para las notificaciones (§4.6)**: SES, SendGrid o SMTP corporativo. Pendiente para D4 (Asíncrono + CD).
+- **IdP concreto detrás del JWT (§2 Actores de soporte, §4.7)**: Cognito, Auth0, Keycloak interno o un IdP del cliente. Pendiente para D5 (Seguridad).
+- **Versionado de la API**: prefijo `/v1/` en la ruta vs header `Accept-Version`. Pendiente para D2.
+- **Política de retención de adjuntos en S3 (§4.5)**: días hasta archivado en Glacier y borrado definitivo. Pendiente para D2/D5.
+- **Valores finales de SLA por tipo/severidad (§4.3)**: hoy hay ejemplos (crítica → 15 min, alta → 1h), pero los valores definitivos se ajustarán con feedback del equipo de Ops antes de D2.
+- **Mecanismo del job de escalamiento (§4.3, CU-04)**: ECS Scheduled Task, cron en un worker permanente o EventBridge Scheduler. Pendiente para D4.
+- **Tamaño inicial de la instancia RDS (§5 Base de datos)** y si arrancamos Single-AZ o Multi-AZ desde D2. Pendiente.
+- **Concurrencia al cambiar estado o asignar (CU-02, CU-03)**: optimistic locking con columna `version` en `tickets` vs lock pesimista. Pendiente para D2.
+- **Identificación del worker frente a la API interna (§4.6, §5 Seguridad)**: IAM role + SigV4 vs token interno rotado. Pendiente para D5.
+- **Modelo de datos para las preferencias de notificación por usuario (§4.6)**: la funcionalidad las menciona pero el esquema (`user_preferences`, columnas, defaults) está sin definir. Pendiente para D2.
+
+---
+
+## 7. Mockups del frontend
+
+Los 8 mockups low-fi del FE viven en [`docs/mockups/`](mockups/). Fueron generados con un MCP de IA generativa (Stitch) y editados por el equipo hasta cubrir los CUs priorizados; el estilo es wireframe en escala de grises (no producto pulido) y son editables para iteraciones posteriores.
+
+| # | Mockup | Caso(s) de uso cubiertos | Actor |
+|---|---|---|---|
+| 1 | Login / Autenticación | Soporte a RBAC §4.7 | Todos los roles |
+| 2 | Cola de tickets con filtros | CU-02 · CU-06 | Agente / SRE |
+| 3 | Crear ticket — Incidente | CU-01 | Reportante |
+| 4 | Crear ticket — Solicitud de servicio | CU-08 | Reportante |
+| 5 | Detalle de ticket + registrar resolución | CU-03 | Agente / SRE |
+| 6 | Historial / timeline del ticket | CU-05 | Reportante y Agente |
+| 7 | Tickets escalados por SLA | CU-04 | Administrador / Agente |
+| 8 | Reportes de resolución por período | CU-07 | Administrador |
+
+Ver [`docs/mockups/README.md`](mockups/README.md) para la descripción detallada de cada pantalla, los elementos UI por CU y el `projectId` de Stitch que permite regenerarlos o editarlos.
+
 ---
 
 ## Anexo IA
@@ -216,13 +250,22 @@ Esta sección delimita explícitamente qué SÍ va a hacer el sistema en el alca
 - Generación de un primer borrador de los casos de uso con formato de user story.
 - Sugerencia de funcionalidades específicas para un sistema de tickets orientado a incidentes de producción en empresa mediana.
 - Revisión de consistencia entre actores, casos de uso y funcionalidades.
+- Generación de **mockups low-fi** del frontend (8 pantallas) a partir de los CUs priorizados, usando un MCP de IA generativa (Stitch).
+- Borrador inicial de la tabla **§5 Mapeo a conceptos del curso** a partir del listado oficial de componentes (Cómputo, Base de datos, Almacenamiento, Asíncrono, Red, Seguridad, Observabilidad).
+- Borrador inicial de la sección **§6 Scope (in/out)** con propuestas de inclusiones y exclusiones razonables para el dominio.
 
 ### Qué aceptamos y editamos
 - El resumen ejecutivo fue generado con IA y editado para reflejar el contexto específico de empresa mediana (50–200 ingenieros) y el foco en trazabilidad y priorización como problemas centrales.
 - Las user stories fueron generadas como borrador y ajustadas para que los criterios de éxito fueran verificables y concretos, no genéricos.
 - La tabla de mapeo a conceptos del curso fue sugerida por IA y editada para incluir los servicios AWS específicos (ECS Fargate, RDS, SQS, S3) que el equipo ya había decidido en el contexto del curso de Automatización.
+- Los 8 mockups generados con Stitch fueron **revisados pantalla por pantalla** por el equipo: validamos que cada uno mostrara los elementos UI requeridos por el criterio de éxito del CU correspondiente (campos "Causa raíz" y "Solución aplicada" requeridos en el detalle de resolución, badge de "SLA vencido" en la cola, niveles L1/L2/L3 visibles en la vista de escalamiento, KPI cards y descarga CSV en el reporte). Editamos los prompts iterativamente hasta alcanzar consistencia visual entre las 8 pantallas reutilizando un mismo design system.
+- La tabla de §5 Mapeo a conceptos del curso fue **verificada celda por celda** para asegurar que cada componente del curso quedara conectado a una funcionalidad concreta del sistema con referencia a su CU o sección §4 de origen; no se permitió texto genérico.
+- La sección §6 Scope (in/out) fue **editada** para: (a) trazar cada bullet de "Dentro del scope" a un CU o §4.x existente, evitando inflar el alcance con funcionalidades no comprometidas; (b) agregar una razón corta a cada exclusión del "Fuera del scope" para que el criterio quede documentado, y (c) extender el listado del "out" con exclusiones que la IA no había propuesto inicialmente (frontend productivo en código, federación multi-IdP, i18n, encuestas CSAT/NPS) pero que el equipo identificó al revisar contra los entregables del curso.
 
 ### Qué descartamos y por qué
 - La IA propuso integración con PagerDuty y Datadog como funcionalidades dentro del scope. Lo descartamos porque agrega complejidad de integración externa sin ejercitar los componentes del curso — se movió explícitamente al out-of-scope.
 - La IA sugirió un caso de uso de dashboard en tiempo real con WebSockets. Lo descartamos porque introduce complejidad de infraestructura no justificada por el dominio en esta fase.
 - La IA propuso SLAs diferenciados por cliente. Lo descartamos porque el contexto es una empresa interna con una sola organización; no es un producto multi-tenant.
+- La IA propuso una **knowledge base** de artículos relacionados a tickets como funcionalidad adicional. La descartamos porque extiende el alcance hacia gestión de contenido, fuera del foco de operaciones del curso; quedó listada explícitamente en "Fuera del scope" (§6).
+- La IA inicialmente generó mockups con estética semi-realista (colores, sombras, look pulido). Los descartamos y ajustamos los prompts para forzar un estilo **wireframe low-fi en escala de grises**, alineado con la consigna de la entrega ("mockups low-fi que pueden generarse con IA y editarse después").
+- La IA sugirió incorporar **encuestas de satisfacción post-resolución** (CSAT/NPS) como parte del reporte (CU-07). Las descartamos porque no ejercitan los componentes troncales del curso ni aportan a ningún CU priorizado; quedaron también listadas en "Fuera del scope" (§6).
