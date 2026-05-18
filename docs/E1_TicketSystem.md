@@ -174,6 +174,41 @@ La columna **Componente del curso** es la del programa de Infraestructura en la 
 
 ---
 
+## 6. Scope (in/out)
+
+Esta sección delimita explícitamente qué SÍ va a hacer el sistema en el alcance de los cursos y qué NO. Sirve de referencia para evitar drift de alcance en las entregas posteriores y para que el lector pueda contrastar rápidamente qué decisiones de producto fueron tomadas en esta fase.
+
+### Dentro del scope
+
+- Creación de tickets de **Incidente** y **Solicitud de servicio** con tipo, severidad y adjuntos (CU-01, CU-08, §4.1).
+- **Priorización automática** en el backend combinando tipo y severidad — la cola ya le llega ordenada al agente (§4.2).
+- **Asignación de tickets y cambio de estado**, con causa raíz y solución aplicada requeridos al resolver (CU-02, CU-03).
+- **Filtrado y búsqueda** de la cola por estado, prioridad, categoría y agente asignado (CU-06).
+- **Escalamiento automático L1 → L2 → L3** disparado por SLA vencido mediante un job asíncrono (§4.3, CU-04).
+- **Historial inmutable** de eventos por ticket — creación, asignación, comentario, cambio de estado, escalamiento, adjuntos — con autor y timestamp UTC (§4.4, CU-05).
+- **Adjuntos en S3** separados de los metadatos del ticket, accedidos mediante URL prefirmada con expiración (§4.5).
+- **Notificaciones asíncronas** por email y Slack, sin bloquear la respuesta de la API (§4.6).
+- **RBAC** con tres roles — Reportante, Agente, Administrador — validado en cada endpoint a partir del token (§4.7).
+- **Reporte agregado** de tickets resueltos por periodo, con métricas y descarga en CSV (CU-07).
+- **Configuración** de SLAs y reglas de escalamiento por parte del administrador (§4.3, §4.7).
+
+### Fuera del scope
+
+- **Integraciones con sistemas externos de paging u observabilidad** (PagerDuty, Datadog, New Relic). _Razón: agregan complejidad de integración externa sin ejercitar los componentes del curso._
+- **Dashboard en tiempo real** con WebSockets o server-sent events. _Razón: introduce complejidad de infraestructura no justificada en esta fase; la cola se refresca por pull/polling._
+- **Multi-tenant**: SLAs y catálogos diferenciados por cliente externo. _Razón: el contexto es una sola empresa interna, no es un producto SaaS multi-cliente._
+- **Aplicación móvil nativa** (iOS/Android). _Razón: el público objetivo es interno (SRE/Ops/Admin) y trabaja en escritorio._
+- **Integraciones bidireccionales con otros sistemas de tickets** (Jira, ServiceNow, Zendesk). _Razón: fuera del alcance del curso; mantener el sistema autocontenido._
+- **Chatbot o asistente IA embebido** para auto-resolución de tickets. _Razón: no ejercita los componentes troncales del curso._
+- **Motor de workflow configurable por el usuario** (BPMN, reglas custom). _Razón: la lógica de estados y escalamientos es fija y suficiente para el dominio._
+- **Knowledge base o artículos relacionados** a tickets. _Razón: extiende el alcance hacia gestión de contenido, fuera del foco de operaciones._
+- **Federación de identidades entre múltiples IdP**. _Razón: el sistema asume un único IdP corporativo (§2 Actores de soporte)._
+- **Internacionalización (i18n)**. _Razón: la UI y los datos viven en español; no hay otras audiencias en esta fase._
+- **Encuestas de satisfacción post-resolución** (CSAT/NPS). _Razón: no aporta a ejercitar los componentes del curso ni a los CUs priorizados._
+- **Frontend productivo implementado en código**. _Razón: en esta entrega se entregan únicamente mockups low-fi (ver `docs/mockups/`); la implementación del FE no es parte del alcance del curso de Infraestructura._
+
+---
+
 ## Anexo IA
 
 ### Qué le pedimos a la IA
