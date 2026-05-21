@@ -26,3 +26,74 @@ variable "tickets_bucket_suffix" {
   type        = string
   default     = "galileo-pdds"
 }
+
+# ---- Compute (Lambda) ----------------------------------------------------
+
+variable "lambda_memory_size" {
+  description = "Memory (MB) allocated to the async worker Lambda."
+  type        = number
+  default     = 128
+}
+
+variable "lambda_timeout_seconds" {
+  description = "Maximum execution time (seconds) for a single invocation of the async worker Lambda."
+  type        = number
+  default     = 30
+}
+
+# ---- Database (RDS PostgreSQL) -------------------------------------------
+
+variable "db_instance_class" {
+  description = "RDS instance class for the Postgres instance."
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "db_multi_az" {
+  description = "If true, RDS provisions a synchronous standby in another AZ. False in dev for cost reasons."
+  type        = bool
+  default     = false
+}
+
+variable "db_password" {
+  description = "Master password for the RDS instance. MUST be provided via the TF_VAR_db_password environment variable — never via .tfvars or .tf files committed to git."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.db_password) >= 12
+    error_message = "db_password must be at least 12 characters long."
+  }
+}
+
+# ---- EKS (Optional Track 1) ----------------------------------------------
+
+variable "eks_cluster_version" {
+  description = "Kubernetes minor version for the EKS control plane."
+  type        = string
+  default     = "1.30"
+}
+
+variable "eks_node_instance_types" {
+  description = "EC2 instance types used by the EKS managed node group."
+  type        = list(string)
+  default     = ["t3.medium"]
+}
+
+variable "eks_node_desired_size" {
+  description = "Target node count for the EKS managed node group at apply time."
+  type        = number
+  default     = 1
+}
+
+variable "eks_node_min_size" {
+  description = "Lower bound for the EKS managed node group."
+  type        = number
+  default     = 1
+}
+
+variable "eks_node_max_size" {
+  description = "Upper bound for the EKS managed node group."
+  type        = number
+  default     = 2
+}

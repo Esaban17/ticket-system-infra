@@ -1,8 +1,12 @@
-# Terraform state — local state files contain resource IDs and may contain
-# sensitive data. Committed intentionally for Delivery 1 (local state phase).
-# Will be moved to remote backend in Delivery 2 and added here then.
-# terraform.tfstate
-# terraform.tfstate.backup
+# Terraform state — local state may contain sensitive resource attributes
+# (RDS endpoints, IAM ARNs, hashed passwords). Main workspace state lives in
+# the remote S3 backend starting in Delivery 2. Bootstrap workspace state
+# (infra/bootstrap/terraform.tfstate) is intentionally committed — see the
+# delivery-2 summary for the rationale.
+terraform.tfstate
+terraform.tfstate.backup
+!infra/bootstrap/terraform.tfstate
+!infra/bootstrap/terraform.tfstate.backup
 
 # Terraform working directory
 .terraform/
@@ -26,3 +30,9 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Claude Code local config (not part of the project)
+.claude/
+
+# Generated Lambda zip (rebuilt by archive_file data source on each plan)
+infra/modules/compute/build/
