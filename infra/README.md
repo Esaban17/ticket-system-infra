@@ -243,3 +243,5 @@ Screenshot mostrando que un segundo `terraform apply` falla con `Error acquiring
 Screenshot de `kubectl get nodes -o wide` con al menos un nodo en `STATUS Ready`:
 
 ![EKS nodes ready](./evidence/eks-nodes.png)
+
+
