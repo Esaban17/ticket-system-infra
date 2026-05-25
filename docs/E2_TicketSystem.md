@@ -8,13 +8,13 @@
 
 ---
 
-## [EN CONSTRUCCIÓN — Secciones por completar]
+## [Entrega 2 - Cómputo y Datos]
 - [x] Resumen de cambios desde E1
-- [ ] Diagrama de contexto
-- [ ] Decisión de cómputo
-- [ ] Modelo de datos
-- [ ] Preguntas abiertas
-- [ ] Anexo IA
+- [x] Diagrama de contexto
+- [x] Decisión de cómputo
+- [x] Modelo de datos
+- [x] Preguntas abiertas
+- [x] Anexo IA
 
 ---
 
@@ -40,19 +40,7 @@ Esta separación — **EKS para la API síncrona, Lambda para el worker asíncro
 
 El diagrama muestra el sistema como una caja negra (nivel C4-1). Se distinguen tres categorías: actores primarios que interactúan directamente, sistemas externos aún por decidir, y servicios cloud propios ya definidos.
 
-```
-[Reportante]  ─────────────────────────────┐
-[Agente/SRE]  ──────────────────────────── ▶  [Sistema de Tickets · AWS us-east-1]
-[Administrador] ──────────────────────────┘         │              │              │
-                                                     │              │              │
-                [Identity Provider] ─────────────────┘              │              │
-                     (por definir · E5)                             │              │
-                                                      [Notificaciones]   [Amazon S3]
-                                                      (por definir·E4)  (adjuntos)
-                                                                              │
-                                                                    [Amazon RDS Postgres]
-                                                                      (tickets y eventos)
-```
+![Diagrama de contexto](diagrams/diagrama_contexto_ticket_system.svg)
 
 **Actores primarios** (color púrpura en el diagrama): Reportante, Agente / SRE, Administrador. Los tres interactúan con el sistema vía API REST sobre HTTPS.
 
