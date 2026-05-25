@@ -32,7 +32,7 @@ Como consecuencia, el mapeo a conceptos del curso en de la sección 5 de E1 se a
 
 E1 mencionaba "SQS + workers" como procesamiento asíncrono pero no especificaba dónde correrían esos workers. Al implementar, el equipo decidió **AWS Lambda** (Python 3.12, 128 MB, dentro de la VPC) para el worker asíncrono, en lugar de un segundo servicio en ECS o EKS. La razón principal: evitar redundancia de planos de contenedores — si la API ya corre en EKS, correr el worker también en contenedor duplica infraestructura sin beneficio. Lambda es event-driven por naturaleza (SQS trigger) y tiene costo cercano a cero en la escala del sistema.
 
-Esta separación — **EKS para la API síncrona, Lambda para el worker asíncrono** — es la decisión de cómputo central de E2 y se documenta con trade-offs completos en §3.
+Esta separación — **EKS para la API síncrona, Lambda para el worker asíncrono** — es la decisión de cómputo central de E2 y se documenta con trade-offs completos en la sección 3.
 
 ---
 
