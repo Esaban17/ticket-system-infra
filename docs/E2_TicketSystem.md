@@ -26,7 +26,7 @@ No se recibió retroalimentación formal del instructor sobre E1. Los cambios qu
 
 En E1 se propuso ECS Fargate como plataforma de cómputo para la API REST. Al implementar los módulos Terraform en Automatización, el equipo eligió **EKS (Elastic Kubernetes Service)** para la API por dos razones concretas: (a) el equipo ya tiene experiencia operando Kubernetes y el curso de Automatización ofrece puntos adicionales por el track EKS, y (b) EKS ofrece mayor control sobre el scheduling y el modelo de red de los pods, lo que facilita la separación de capas que se diseñará en E3.
 
-Como consecuencia, el mapeo a conceptos del curso en §5 de E1 se actualiza: donde decía "ECS Fargate" para el componente de Cómputo (API), ahora dice **EKS con managed node group**.
+Como consecuencia, el mapeo a conceptos del curso en de la sección 5 de E1 se actualiza: donde decía "ECS Fargate" para el componente de Cómputo (API), ahora dice **EKS con managed node group**.
 
 ### Cambio 2 — Cómputo del worker asíncrono: decisión nueva (no estaba en E1)
 
