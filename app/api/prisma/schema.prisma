@@ -28,12 +28,13 @@ datasource db {
 }
 
 // ── Placeholder ──────────────────────────────────────────────────────────────
-// Modelo temporal para verificar que la conexión a Postgres funciona.
-// Luis André lo reemplazará en EP-02 con el esquema real de usuarios y tickets.
+// Prisma exige >=1 modelo para generar el cliente. Este modelo se mantiene
+// hasta que Luis André introduzca el dominio real en EP-02
+// (User, Ticket, Comment, Attachment, AuditLog, Tag, TicketTag) y lo elimine.
 
-model _Placeholder {
+model ScaffoldProbe {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
 
-  @@map("_placeholder")
+  @@map("scaffold_probe")
 }
