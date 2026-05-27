@@ -1,0 +1,43 @@
+# Dependencias (se reinstalan en el builder stage)
+node_modules/
+
+# Artefactos de build locales
+dist/
+build/
+
+# Variables de entorno — NUNCA empacar en la imagen
+.env
+.env.*
+.env.local
+.env.development
+.env.staging
+.env.production
+
+# Cobertura y reportes
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+logs/
+
+# Tests
+test/
+**/*.spec.ts
+**/*.e2e-spec.ts
+
+# Configuración local de IDEs y OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Husky
+.husky/
+
+# Docs (no necesarias en la imagen)
+README.md
