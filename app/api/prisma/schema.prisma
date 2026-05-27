@@ -1,0 +1,39 @@
+// ============================================================
+// Prisma Schema — Ticket System API
+// ============================================================
+//
+// Estado actual: esqueleto mínimo con datasource y generator.
+//
+// TODO (EP-02 — Luis André): agregar modelos de dominio:
+//   - User       (id, email, role, etc.)
+//   - Ticket     (id, title, status, priority, sla_deadline, etc.)
+//   - Comment    (id, ticketId, authorId, body, etc.)
+//   - Attachment (id, ticketId, s3Key, size, mimeType, etc.)
+//   - AuditLog   (id, ticketId, actorId, action, oldValue, newValue, etc.)
+//   - Tag        (id, name)
+//   - TicketTag  (ticketId, tagId)  — relación M:N
+//
+// Para agregar modelos:
+//   1. Editar este archivo con el modelo nuevo.
+//   2. Ejecutar: npm run prisma:migrate:dev -- --name <nombre_descriptivo>
+//   3. Ejecutar: npm run prisma:generate
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Placeholder ──────────────────────────────────────────────────────────────
+// Modelo temporal para verificar que la conexión a Postgres funciona.
+// Luis André lo reemplazará en EP-02 con el esquema real de usuarios y tickets.
+
+model _Placeholder {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  @@map("_placeholder")
+}
