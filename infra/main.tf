@@ -1,30 +1,36 @@
 # ---------------------------------------------------------------------------
-# Root module — wires together compute, storage, database, and EKS modules.
+# Root module — wires together network, compute, storage, database, and EKS.
 #
-# Network: uses the default VPC and its subnets as a placeholder until
-# Delivery 3 provisions a dedicated VPC. This decision is documented in
-# infra/README.md and docs/trade-offs/04-eks-track.md.
+# Delivery 3 (BL-107..BL-110) replaced the Delivery 2 placeholder (default VPC
+# + default subnets) with a dedicated VPC provisioned by the ./modules/network
+# module: 10.20.0.0/16, 2 AZs, 1 public /24 + 1 private /24 per AZ, single
+# NAT, IGW and 5 VPC endpoints (S3 gateway + ECR/Secrets Manager/Logs/SQS
+# interface).
+#
+# Subnet placement:
+#   - RDS         → private subnets (no public access)
+#   - Lambda ENIs → private subnets (egress through NAT and VPC endpoints)
+#   - EKS         → control plane and nodes get BOTH public and private
+#                   subnets. Public ones carry kubernetes.io/role/elb=1 so
+#                   the AWS Load Balancer Controller can place internet
+#                   facing ALBs; node groups should be pinned to private
+#                   subnets via subnet tags / nodegroup config later.
 # ---------------------------------------------------------------------------
 
-# ---- Default VPC and subnets (placeholder network) -----------------------
-
-data "aws_vpc" "default" {
-  default = true
+locals {
+  eks_cluster_name = "${var.project_name}-${var.environment}-eks"
 }
 
-# Filter default subnets to AZs that support every service we use.
-# us-east-1e does NOT support EKS control plane instances and would cause
-# CreateCluster to fail with UnsupportedAvailabilityZoneException.
-data "aws_subnets" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
+# ---- Network --------------------------------------------------------------
 
-  filter {
-    name   = "availability-zone"
-    values = ["us-east-1a", "us-east-1b", "us-east-1c", "us-east-1d", "us-east-1f"]
-  }
+module "network" {
+  source = "./modules/network"
+
+  name_prefix        = "${var.project_name}-${var.environment}"
+  environment        = var.environment
+  vpc_cidr           = var.vpc_cidr
+  availability_zones = var.availability_zones
+  cluster_name       = local.eks_cluster_name
 }
 
 # ---- Storage --------------------------------------------------------------
@@ -47,8 +53,8 @@ module "compute" {
   name            = "worker"
   memory_size     = var.lambda_memory_size
   timeout_seconds = var.lambda_timeout_seconds
-  vpc_id          = data.aws_vpc.default.id
-  subnet_ids      = data.aws_subnets.default.ids
+  vpc_id          = module.network.vpc_id
+  subnet_ids      = module.network.private_subnet_ids
 }
 
 # ---- Database (RDS PostgreSQL) -------------------------------------------
@@ -61,8 +67,8 @@ module "database" {
 
   environment           = var.environment
   project_name          = var.project_name
-  vpc_id                = data.aws_vpc.default.id
-  subnet_ids            = data.aws_subnets.default.ids
+  vpc_id                = module.network.vpc_id
+  subnet_ids            = module.network.private_subnet_ids
   app_security_group_id = module.compute.security_group_id
   instance_class        = var.db_instance_class
   multi_az              = var.db_multi_az
@@ -71,14 +77,17 @@ module "database" {
 }
 
 # ---- EKS (Optional Track 1) ----------------------------------------------
+# Receives both subnet sets: public for ALBs/ELBs created by the AWS Load
+# Balancer Controller, private for node groups and the control plane ENIs.
 
 module "eks" {
   source = "./modules/eks"
 
-  cluster_name        = "${var.project_name}-${var.environment}-eks"
+  cluster_name        = local.eks_cluster_name
   cluster_version     = var.eks_cluster_version
-  vpc_id              = data.aws_vpc.default.id
-  subnet_ids          = data.aws_subnets.default.ids
+  vpc_id              = module.network.vpc_id
+  subnet_ids          = module.network.private_subnet_ids
+  public_subnet_ids   = module.network.public_subnet_ids
   node_min_size       = var.eks_node_min_size
   node_max_size       = var.eks_node_max_size
   node_desired_size   = var.eks_node_desired_size

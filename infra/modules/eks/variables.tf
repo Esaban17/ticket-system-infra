@@ -15,13 +15,19 @@ variable "vpc_id" {
 }
 
 variable "subnet_ids" {
-  description = "List of subnet IDs (≥2 AZs) for the cluster and node groups. Default VPC subnets are acceptable as a placeholder for Delivery 2."
+  description = "Private subnet IDs (≥2 AZs) where the control-plane ENIs and managed node groups are placed."
   type        = list(string)
 
   validation {
     condition     = length(var.subnet_ids) >= 2
-    error_message = "EKS requires at least 2 subnets in different AZs."
+    error_message = "EKS requires at least 2 private subnets in different AZs."
   }
+}
+
+variable "public_subnet_ids" {
+  description = "Public subnet IDs (≥2 AZs) advertised to the cluster so internet-facing ALBs created by the AWS Load Balancer Controller can be placed in them. Pass an empty list to keep the cluster private-only."
+  type        = list(string)
+  default     = []
 }
 
 variable "node_min_size" {

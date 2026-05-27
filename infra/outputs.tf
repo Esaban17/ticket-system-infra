@@ -5,6 +5,33 @@
 # → database SG ingress) or re-exported here at the root.
 # ---------------------------------------------------------------------------
 
+# ---- Network --------------------------------------------------------------
+
+output "vpc_id" {
+  description = "ID of the dedicated VPC provisioned by the network module. Consumed by evidence commands and by humans hooking up follow-on resources (e.g. peering, transit gateway)."
+  value       = module.network.vpc_id
+}
+
+output "vpc_cidr" {
+  description = "Primary IPv4 CIDR of the dedicated VPC."
+  value       = module.network.vpc_cidr
+}
+
+output "public_subnet_ids" {
+  description = "Public subnet IDs (one per AZ). Internet-facing ALBs and the NAT Gateway live here."
+  value       = module.network.public_subnet_ids
+}
+
+output "private_subnet_ids" {
+  description = "Private subnet IDs (one per AZ). EKS nodes, RDS and Lambda ENIs live here."
+  value       = module.network.private_subnet_ids
+}
+
+output "nat_eip" {
+  description = "Elastic IP of the NAT Gateway. Useful for external allow-lists."
+  value       = module.network.nat_eip
+}
+
 # ---- Storage --------------------------------------------------------------
 
 output "tickets_bucket_name" {
