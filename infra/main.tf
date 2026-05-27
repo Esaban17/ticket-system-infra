@@ -70,6 +70,18 @@ module "database" {
   deletion_protection   = var.environment == "prod"
 }
 
+# ---- Registry (ECR for the API container image) --------------------------
+# Provisioned ahead of BL-102 (Dockerfile + initial push) so the image URL
+# is available as a stable terraform output before any container work begins.
+
+module "registry" {
+  source = "./modules/registry"
+
+  env             = var.environment
+  name_prefix     = var.project_name
+  repository_name = "${var.project_name}-api"
+}
+
 # ---- EKS (Optional Track 1) ----------------------------------------------
 
 module "eks" {
