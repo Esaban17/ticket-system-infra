@@ -18,8 +18,18 @@ module "eks" {
   cluster_name    = var.cluster_name
   cluster_version = var.cluster_version
 
-  vpc_id     = var.vpc_id
-  subnet_ids = var.subnet_ids
+  vpc_id = var.vpc_id
+
+  # Node groups + workload ENIs (and the ALBs surfaced by the AWS Load
+  # Balancer Controller) live across all supplied subnets. The controller
+  # picks public vs private using the kubernetes.io/role/* tags applied by
+  # the network module, so we pass the union here.
+  subnet_ids = concat(var.subnet_ids, var.public_subnet_ids)
+
+  # Control-plane ENIs are pinned to the PRIVATE subnets only — they have
+  # no need to live in public subnets and this avoids burning a public IP
+  # per AZ.
+  control_plane_subnet_ids = var.subnet_ids
 
   # Public endpoint enabled so kubectl from the developer's laptop works
   # without a bastion. Private endpoint also enabled so node groups talk to

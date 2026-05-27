@@ -21,6 +21,20 @@ variable "region" {
   default     = "us-east-1"
 }
 
+# ---- Network -------------------------------------------------------------
+
+variable "vpc_cidr" {
+  description = "Primary IPv4 CIDR for the dedicated VPC provisioned by the network module."
+  type        = string
+  default     = "10.20.0.0/16"
+}
+
+variable "availability_zones" {
+  description = "Availability zones across which public and private subnets are spread. Two AZs is the minimum supported by RDS multi-AZ and EKS."
+  type        = list(string)
+  default     = ["us-east-1a", "us-east-1b"]
+}
+
 variable "tickets_bucket_suffix" {
   description = "Suffix appended to the S3 bucket name for ticket attachments and reports. Must be globally unique across all AWS accounts. Use a short random string or your team identifier."
   type        = string
