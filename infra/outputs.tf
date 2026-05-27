@@ -41,6 +41,23 @@ output "database_arn" {
   value       = module.database.instance_arn
 }
 
+# ---- Registry (ECR) -------------------------------------------------------
+
+output "ecr_repository_url" {
+  description = "URL of the ECR repository for the API container image. Consumed by CI in BL-102 (docker push) and by container compute (ECS/EKS) task definitions in later deliveries."
+  value       = module.registry.ecr_repository_url
+}
+
+output "ecr_repository_arn" {
+  description = "ARN of the ECR repository. Referenced by IAM policies granting pull/push permissions to CI and to the task execution role."
+  value       = module.registry.ecr_repository_arn
+}
+
+output "ecr_repository_name" {
+  description = "Bare name of the ECR repository. Used by `aws ecr describe-repositories --repository-names`."
+  value       = module.registry.ecr_repository_name
+}
+
 # ---- EKS ------------------------------------------------------------------
 
 output "eks_cluster_name" {
