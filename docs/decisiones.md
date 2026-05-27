@@ -93,3 +93,76 @@ requerimiento de no-root.
 
 - Superficie ligeramente mayor vs distroless. Mitigada con `apt-get` solo
   de `openssl` y eliminación de listas de paquetes en el mismo `RUN`.
+
+---
+
+## D-003 — Manejo de ambientes en AWS: prod en código, solo dev se aprovisiona
+
+**Fecha:** 2026-05-27
+**Estado:** Aceptado
+**Owner:** Estuardo Sabán
+
+### Contexto
+
+El repositorio quedó estructurado desde E2 con dos ambientes Terraform:
+`infra/envs/dev/` e `infra/envs/prod/`, cada uno con su propio `*.tfvars` y
+diferencias de capacidad (multi-AZ, instance class, tamaño del node group).
+
+Al planear el roadmap de D3/D4/D5 se evaluó si valía la pena aprovisionar
+ambos ambientes en AWS o mantener solo uno. La rúbrica del curso (E1..E5,
+Mid Course) **no exige** dos ambientes; lo que se evalúa es la cobertura de
+componentes (Red, Asíncrono, Seguridad, etc.), no la promoción dev → prod.
+
+### Opciones evaluadas
+
+| Opción | Aprovisiona dev | Aprovisiona prod | Costo adicional/mes | Trabajo duplicado |
+|---|---|---|---|---|
+| A | ✅ | ❌ (borrar `envs/prod/`) | $0 | No |
+| **B (elegida)** | **✅** | **❌ (mantener código, no aplicar)** | **$0** | **No** |
+| C | ✅ | ✅ | ~$200+ | Sí |
+
+### Decisión
+
+**Opción B**: se mantiene `infra/envs/prod/` como código de referencia, pero
+**solo `dev` se aprovisiona en AWS** durante el curso. La configuración de
+`prod` queda como ejercicio documental de cómo se promovería el sistema a
+producción real (multi-AZ, node group más grande, etc.).
+
+### Razones
+
+1. **La rúbrica no lo pide.** Los componentes del curso se evalúan sobre la
+   arquitectura desplegada, no sobre tener dos aprovisionamientos paralelos.
+2. **Costo prohibitivo para equipo de 2 personas y proyecto académico
+   corto:** un EKS adicional ($73/mes), RDS multi-AZ ($60), NAT extra ($33),
+   ALB ($22), VPC endpoints ($35) suman >$200 mensuales que no aportan al
+   aprendizaje evaluado.
+3. **Preserva el patrón:** mantener el código de `prod` permite demostrar
+   en la defensa final que el repo está diseñado para multi-ambiente. En
+   D5 se mostrará `terraform plan` contra `prod.tfvars` (sin apply) y un
+   workflow gateado `tf-apply-prod.yml` con `required reviewers`, que
+   evidencia el patrón de promoción sin ejecutarlo.
+4. **Si se necesita segregación adicional para la demo**, se usarán
+   **namespaces de Kubernetes** (`ticket-system-dev` y `ticket-system-stg`)
+   dentro del mismo cluster. Es gratis y muestra segregación lógica.
+
+### Trade-offs aceptados
+
+- `envs/prod/` no será verificado end-to-end contra AWS hasta una fase
+  posterior al curso. Riesgo: drift entre el código de prod y la realidad
+  de AWS. Mitigación: `terraform validate` y `terraform test` siguen
+  corriendo en CI para `prod`, garantizando que el código sigue siendo
+  sintácticamente y semánticamente válido aunque no se aplique.
+- El workflow `tf-apply-prod.yml` (BL-201, propuesto) queda como skeleton
+  documental: existirá pero nunca se ejecutará durante el curso.
+
+### Implicaciones para el backlog
+
+- **BL-110 (migración a VPC dedicada):** aplica solo a `dev`. El runbook
+  `docs/runbooks/migracion-vpc.md` ya está alineado con esta decisión.
+- **CI/CD (`terraform-ci.yml`):** ya hace `plan` solo contra `dev.tfvars`.
+  No requiere cambios.
+- **Workflows futuros que toquen prod (BL-135, BL-201):** se mantienen como
+  scaffolding documental con `workflow_dispatch` y `required reviewers`,
+  pero nunca se ejecutan durante el ciclo del curso.
+- **`infra/envs/prod/README.md`** se agrega con un banner que aclara el
+  estado para evitar confusión futura.
