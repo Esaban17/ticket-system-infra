@@ -10,9 +10,9 @@
 
 # Variables mínimas requeridas para que el módulo planifique sin error.
 variables {
-  env             = "dev"
-  name_prefix     = "ticket-system"
-  repository_name = "ticket-system-api"
+  env                  = "dev"
+  name_prefix          = "ticket-system"
+  repository_name      = "ticket-system-api"
   max_tagged_images    = 10
   untagged_expiry_days = 7
 }
@@ -76,32 +76,32 @@ run "lifecycle_policy_untagged_rule" {
   command = plan
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].rulePriority == 1
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].rulePriority == 1
     error_message = "La primera regla de lifecycle debe tener rulePriority = 1"
   }
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].selection.tagStatus == "untagged"
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].selection.tagStatus == "untagged"
     error_message = "La primera regla debe aplicar a imágenes untagged"
   }
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].selection.countType == "sinceImagePushed"
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].selection.countType == "sinceImagePushed"
     error_message = "La primera regla debe expirar por antigüedad (sinceImagePushed)"
   }
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].selection.countNumber == 7
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].selection.countNumber == 7
     error_message = "Las imágenes untagged deben expirar a los 7 días (BL-101 default)"
   }
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].selection.countUnit == "days"
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].selection.countUnit == "days"
     error_message = "La unidad de tiempo de la regla untagged debe ser 'days'"
   }
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].action.type == "expire"
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].action.type == "expire"
     error_message = "La acción de la regla untagged debe ser 'expire'"
   }
 }
@@ -113,32 +113,32 @@ run "lifecycle_policy_tagged_rule" {
   command = plan
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].rulePriority == 2
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].rulePriority == 2
     error_message = "La segunda regla de lifecycle debe tener rulePriority = 2"
   }
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].selection.tagStatus == "tagged"
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].selection.tagStatus == "tagged"
     error_message = "La segunda regla debe aplicar a imágenes tagged"
   }
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].selection.countType == "imageCountMoreThan"
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].selection.countType == "imageCountMoreThan"
     error_message = "La segunda regla debe expirar por conteo (imageCountMoreThan)"
   }
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].selection.countNumber == 10
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].selection.countNumber == 10
     error_message = "Deben retenerse exactamente 10 imágenes tagged (BL-101)"
   }
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].selection.tagPatternList == ["*"]
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].selection.tagPatternList == ["*"]
     error_message = "El tagPatternList debe ser ['*'] para capturar cualquier tag"
   }
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].action.type == "expire"
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].action.type == "expire"
     error_message = "La acción de la regla tagged debe ser 'expire'"
   }
 }
@@ -154,7 +154,7 @@ run "custom_max_tagged_images" {
   }
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].selection.countNumber == 5
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[1].selection.countNumber == 5
     error_message = "El valor custom de max_tagged_images=5 debe propagarse a la lifecycle policy"
   }
 }
@@ -170,7 +170,7 @@ run "custom_untagged_expiry_days" {
   }
 
   assert {
-    condition = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].selection.countNumber == 14
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this.policy).rules[0].selection.countNumber == 14
     error_message = "El valor custom de untagged_expiry_days=14 debe propagarse a la lifecycle policy"
   }
 }
