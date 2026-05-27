@@ -37,3 +37,15 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Test with coverage (gate ≥70%)
+        run: npm run test:cov
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: app/api/../coverage
+          if-no-files-found: ignore
+          retention-days: 14
