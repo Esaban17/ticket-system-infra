@@ -17,3 +17,4 @@ Las decisiones se referencian desde `infra/docs/delivery-2-summary.md` (puntos 1
 | [03](./03-database.md) | Motor de base de datos | **RDS PostgreSQL 16** |
 | [04](./04-eks-track.md) | Entrar al EKS Track opcional (+40 pts) | **Sí, con default VPC como placeholder** |
 | [05](./05-state-backend.md) | Backend remoto y patrón de bootstrap | **S3 + DynamoDB lock, bootstrap workspace separado** |
+| [06](./06-network.md) | Diseño de la capa de red (E3) | **VPC `10.20.0.0/16`, 2 AZs, NAT single + 5 endpoints, pods privados con ALB** |
