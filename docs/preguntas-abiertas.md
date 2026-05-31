@@ -60,7 +60,7 @@ headroom a un tercer tier.
 
 ### Rationale
 
-Resumido aquí; detalle completo en `docs/E3_TicketSystem.md` §5.1 y
+Resumido aquí; detalle completo en `docs/TicketSystem.md` §5.1 y
 `docs/trade-offs/06-network.md`.
 
 1. RFC1918 y sin colisión con la default VPC (`172.31.0.0/16`).
