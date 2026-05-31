@@ -11,7 +11,7 @@
 
 ## Propósito
 
-Esta carpeta contiene los **8 mockups de baja fidelidad** del frontend del Sistema de Tickets e Incidentes, requeridos por la Entrega #1 (ver [`../E1_TicketSystem.md`](../E1_TicketSystem.md)). Los mockups cubren los **8 casos de uso priorizados** (4 P0, 2 P1, 2 P2) definidos en ese documento.
+Esta carpeta contiene los **8 mockups de baja fidelidad** del frontend del Sistema de Tickets e Incidentes, originalmente requeridos por la Entrega #1 (ver el documento vivo del proyecto en [`../TicketSystem.md`](../TicketSystem.md), o el snapshot histórico de E1 en el tag git `inube-entrega-1`). Los mockups cubren los **8 casos de uso priorizados** (4 P0, 2 P1, 2 P2) definidos en ese documento.
 
 Los mockups fueron generados con IA usando el **MCP de Stitch** (Google), en modo *Text-to-UI* sobre un design system propio en escala de grises (estilo *Minimalist Blueprint* — herramienta interna de SRE/Ops) y son **editables**: pueden regenerarse o modificarse posteriormente.
 

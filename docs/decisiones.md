@@ -233,7 +233,7 @@ Q-NET-1..4).
 
 ### Referencias
 
-- `docs/E3_TicketSystem.md` §5 — diseño detallado
+- `docs/TicketSystem.md` §5 — diseño detallado (versión Entrega 3)
 - `docs/trade-offs/06-network.md` — tablas de costo y alternativas
 - `docs/runbooks/migracion-vpc.md` — runbook de migración default
   VPC → dedicada para `dev`

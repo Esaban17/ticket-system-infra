@@ -2058,7 +2058,7 @@ Cobertura completa; ningún componente queda sin épica.
 
 ### Épica EP-20 — Documentación de entregas (placeholder)
 
-Items detallados se redactan al cerrar cada entrega (D3, D4, D5). Cada entrega tendrá un item del tipo "Redactar `docs/E3_TicketSystem.md` con cambios, decisiones, RFCs cerradas y Anexo IA", siguiendo el patrón de E1 y E2.
+Items detallados se redactan al cerrar cada entrega (D3, D4, D5). Cada entrega actualiza el documento vivo del proyecto (`docs/TicketSystem.md`) con cambios, decisiones, RFCs cerradas y Anexo IA. Las versiones anteriores quedan inmutables en git history bajo los tags `inube-entrega-N`. No se crean archivos hermanos `EN_TicketSystem.md`.
 
 ---
 

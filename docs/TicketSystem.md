@@ -1,4 +1,4 @@
-# Sistema de Tickets e Incidentes — Entrega 3: Red
+# Sistema de Tickets e Incidentes — Documento del Proyecto
 **Universidad Galileo · Postgrado en Diseño y Desarrollo de Software · Infraestructura en la Nube**
 **Ciclo Mayo–Junio 2026**
 
@@ -6,9 +6,13 @@
 - Luis André Morales
 - Erick Estuardo Saban
 
+**Versión vigente:** Entrega 3 — Red (2026-05-31)
+
+**Historial de versiones:** este es un documento único que evoluciona en cada entrega. Las versiones anteriores quedan inmutables en `git history` bajo los tags `inube-entrega-1` (E1 — Visión y casos de uso) e `inube-entrega-2` (E2 — Cómputo y datos).
+
 ---
 
-## [Entrega 3 - Red]
+## [Versión actual: Entrega 3 — Red]
 - [x] Resumen de cambios desde E2
 - [x] Diagrama de contexto (heredado)
 - [x] Diagrama de contenedores (v1)

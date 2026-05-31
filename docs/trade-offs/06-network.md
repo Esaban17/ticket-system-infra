@@ -82,5 +82,5 @@ Delivery 3 (E3) exige diseñar la capa de red sobre el cómputo (EKS + Lambda) y
 
 - Implementación: `infra/modules/network/{variables,vpc,gateways,endpoints,main,outputs}.tf`
 - Runbook de migración default VPC → dedicada: `docs/runbooks/migracion-vpc.md`
-- Documento de la entrega: `docs/E3_TicketSystem.md` §5
+- Documento del proyecto: `docs/TicketSystem.md` §5 (versión Entrega 3)
 - Decisión registrada en ADR: `docs/decisiones.md` D-004
