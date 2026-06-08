@@ -9,6 +9,8 @@ eks_cluster_arn = "arn:aws:eks:us-east-1:203036352580:cluster/ticket-system-dev-
 eks_cluster_endpoint = "https://4983D5BEE7BC08796D67C54FCB9424BC.gr7.us-east-1.eks.amazonaws.com"
 eks_cluster_name = "ticket-system-dev-eks"
 eks_cluster_security_group_id = "sg-0dd471fb273761ff0"
+ingress_hostname = "k8s-ticketsy-ticketsy-0187f58f9a-125632820.us-east-1.elb.amazonaws.com"
+ingress_url = "http://k8s-ticketsy-ticketsy-0187f58f9a-125632820.us-east-1.elb.amazonaws.com"
 nat_gateway_ids = [
   "nat-0e792b33f49a6ec43",
 ]

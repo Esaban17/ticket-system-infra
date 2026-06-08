@@ -1,0 +1,27 @@
+* Host k8s-ticketsy-ticketsy-0187f58f9a-125632820.us-east-1.elb.amazonaws.com:80 was resolved.
+* IPv6: (none)
+* IPv4: 3.225.135.195, 52.44.112.132
+*   Trying 3.225.135.195:80...
+* Connected to k8s-ticketsy-ticketsy-0187f58f9a-125632820.us-east-1.elb.amazonaws.com (3.225.135.195) port 80
+> POST /v1/tickets HTTP/1.1
+> Host: k8s-ticketsy-ticketsy-0187f58f9a-125632820.us-east-1.elb.amazonaws.com
+> User-Agent: curl/8.7.1
+> Accept: */*
+> Content-Type: application/json
+> Content-Length: 59
+> 
+} [59 bytes data]
+* upload completely sent off: 59 bytes
+< HTTP/1.1 201 Created
+< Date: Mon, 08 Jun 2026 06:18:07 GMT
+< Content-Type: application/json; charset=utf-8
+< Content-Length: 138
+< Connection: keep-alive
+< X-Powered-By: Express
+< Vary: Origin
+< Access-Control-Allow-Credentials: true
+< ETag: W/"8a-PIooYYskLv9Bkz3/RjT7q7KYM40"
+< 
+{ [138 bytes data]
+* Connection #0 to host k8s-ticketsy-ticketsy-0187f58f9a-125632820.us-east-1.elb.amazonaws.com left intact
+{"key":"uploads/2026-06-08T06-18-07-400Z-3afb1f0f-7d2d-49ab-ac4e-d52aa913c182.json","bucket":"ticket-system-dev-attachments-galileo-pdds"}

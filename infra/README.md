@@ -251,81 +251,94 @@ Screenshot de `kubectl get nodes -o wide` con al menos un nodo en `STATUS Ready`
 Comandos de captura en [`infra/evidence/capture-delivery-3.sh`](./evidence/capture-delivery-3.sh).
 Resumen escrito en [`infra/docs/delivery-3-summary.md`](./docs/delivery-3-summary.md).
 
+> Nota de captura: las evidencias `*.png` de consola se sustituyen aquí por su
+> equivalente reproducible vía AWS CLI / `curl` en archivos `*.txt` (más
+> verificable que una captura). El endpoint del API de EKS está bloqueado desde
+> la red de build, por lo que la evidencia de nodos (F) se tomó vía AWS API en
+> lugar de `kubectl`. Todo el stack in-cluster se aplicó vía GitHub Actions
+> (`terraform-apply.yml`) desde una red que sí alcanza EKS.
+
 ### Deliverable A — Network Foundation (`terraform output`)
 
-VPC ID, subnets públicas/privadas y NAT Gateway provisionados por `module.network`:
+VPC, subnets públicas/privadas, NAT Gateway y SGs provisionados por `module.network` (archivo completo: [`network-foundation.txt`](./evidence/network-foundation.txt)):
 
 ```text
-$(< infra/evidence/network-foundation.txt)
+vpc_id                = "vpc-06883c7ea728434d5"
+vpc_cidr              = "10.20.0.0/16"
+public_subnet_ids     = ["subnet-03783df4a113bed6f", "subnet-05dff2dabee355dfe"]
+private_subnet_ids    = ["subnet-095ba061c360a8e4f", "subnet-01fc32691e4c64e79"]
+nat_gateway_ids       = ["nat-0e792b33f49a6ec43"]
+nat_public_ips        = ["18.205.146.120"]
+ingress_url           = "http://k8s-ticketsy-ticketsy-0187f58f9a-125632820.us-east-1.elb.amazonaws.com"
+web/app/db SG ids     = sg-019d0daf1c622a830 / sg-081c3adb0338f8644 / sg-0594086c02bf0a0cd
+eks_cluster_sg_id     = "sg-0dd471fb273761ff0"
+tickets_bucket_name   = "ticket-system-dev-attachments-galileo-pdds"
 ```
-
-Archivo: [`infra/evidence/network-foundation.txt`](./evidence/network-foundation.txt)
 
 ### Deliverable B — Network Security (Security Groups + NACLs)
 
-Extracto del `terraform plan` con las reglas SG-to-SG (web-sg → app-sg → db-sg):
+Reglas SG-to-SG aplicadas (`web-sg → app-sg → db-sg`); **db-sg no tiene ingress `0.0.0.0/0`** (archivo completo con `terraform state show` + describe + NACLs: [`security-groups-plan.txt`](./evidence/security-groups-plan.txt)):
 
 ```text
-$(< infra/evidence/security-groups-plan.txt)
+web-sg (sg-019d…): ingress 80 ← 0.0.0.0/0, 443 ← 0.0.0.0/0;  egress 8080 → app-sg
+app-sg (sg-081c…): ingress 8080 ← web-sg (sg-019d…);          egress 5432 → db-sg
+db-sg  (sg-0594…): ingress 5432 ← app-sg (sg-081c…);          (sin egress, sin 0.0.0.0/0)
+NACLs: nacl-public (acl-0978…) y nacl-private (acl-0b76…) con reglas stateless in/out
 ```
 
-Archivo: [`infra/evidence/security-groups-plan.txt`](./evidence/security-groups-plan.txt)
-
-Screenshot de las reglas inbound/outbound en la consola:
-
-![Security groups](./evidence/security-groups.png)
+Captura de consola (opcional): `infra/evidence/security-groups.png`.
 
 ### Deliverable C — Public Ingress (ALB)
 
-`curl -v` contra la URL pública del ALB (Ingress → ClusterIP Service → pods):
+`curl -v` contra la URL pública del ALB (Ingress → Service ClusterIP → pods). Archivo: [`ingress-curl.txt`](./evidence/ingress-curl.txt):
 
 ```text
-$(< infra/evidence/ingress-curl.txt)
+> GET /healthz HTTP/1.1
+> Host: k8s-ticketsy-ticketsy-0187f58f9a-125632820.us-east-1.elb.amazonaws.com
+< HTTP/1.1 200 OK
+{"status":"ok"}
 ```
 
-Archivo: [`infra/evidence/ingress-curl.txt`](./evidence/ingress-curl.txt)
-
-Screenshot del ALB / target group con targets `healthy`:
-
-![Ingress healthy](./evidence/ingress-healthy.png)
+Captura del target group con targets `healthy` (opcional): `infra/evidence/ingress-healthy.png`.
 
 ### Deliverable D — End-to-End Connectivity Proof
 
-`GET /v1/tickets` devolviendo datos leídos de RDS (no hardcodeados):
+`GET /v1/tickets` → `200 OK`, datos **leídos de RDS** (fila sembrada por el Job, no hardcodeada). Archivo: [`e2e-get.txt`](./evidence/e2e-get.txt):
 
 ```text
-$(< infra/evidence/e2e-get.txt)
+< HTTP/1.1 200 OK
+[{"id":1,"title":"Seed ticket — Delivery 3 end-to-end connectivity proof",
+  "status":"open","priority":"high","createdAt":"2026-06-08T06:14:50.582Z"}]
 ```
 
-`POST /v1/tickets` devolviendo `HTTP 201` con la object key escrita en S3:
+`POST /v1/tickets` → `201 Created`, objeto **escrito en S3**, devuelve la object key. Archivos: [`e2e-post.txt`](./evidence/e2e-post.txt) · [`e2e-storage.txt`](./evidence/e2e-storage.txt):
 
 ```text
-$(< infra/evidence/e2e-post.txt)
+< HTTP/1.1 201 Created
+{"key":"uploads/2026-06-08T06-18-07-400Z-3afb1f0f-7d2d-49ab-ac4e-d52aa913c182.json",
+ "bucket":"ticket-system-dev-attachments-galileo-pdds"}
+
+# objeto verificado en el bucket (SSE AES256, 59 bytes):
+2026-06-08 00:18:08   59  uploads/2026-06-08T06-18-07-400Z-3afb1f0f-...json
 ```
 
-Archivos: [`e2e-get.txt`](./evidence/e2e-get.txt) · [`e2e-post.txt`](./evidence/e2e-post.txt)
+Captura del objeto en consola S3 (opcional): `infra/evidence/e2e-storage.png`.
 
-Screenshot del objeto nuevo visible en el bucket S3:
+### Deliverable E — CI Pipeline (plan-on-PR + apply-on-merge)
 
-![E2E storage object](./evidence/e2e-storage.png)
+- **plan-on-PR:** PR [#12](https://github.com/gitcombo/ticket-system-infra/pull/12) — el workflow `Terraform CI` corrió y publicó el plan como comentario ([run 27119328956](https://github.com/gitcombo/ticket-system-infra/actions/runs/27119328956)).
+- **apply-on-merge:** al hacer merge a `main`, `terraform-apply.yml` aplicó la capa de red + ingress (incluida la instalación in-cluster del ALB Controller y el Ingress).
 
-### Deliverable E — CI Pipeline (plan on PR)
-
-Screenshot del workflow `Terraform CI` con el plan publicado como comentario en el PR:
-
-![CI plan comment](./evidence/ci-plan.png)
-
-PR de ejemplo: _(enlace al PR de Delivery 3 en GitHub)_
+Captura del comentario de plan (opcional): `infra/evidence/ci-plan.png`.
 
 ### Deliverable F — EKS nodes in private subnets
 
-`kubectl get nodes -o wide` mostrando ≥1 nodo `Ready` con IP en subred privada (`10.20.10.x` / `10.20.11.x`):
-
-![EKS nodes D3](./evidence/eks-nodes-d3.png)
+Nodo `Ready` en subred privada, **sin IP pública** (capturado vía AWS API porque el endpoint de EKS está bloqueado desde la red de build). Archivo: [`eks-nodes-d3.txt`](./evidence/eks-nodes-d3.txt):
 
 ```text
-$(< infra/evidence/eks-nodes-d3.txt)
+node group subnets: [subnet-01fc32691e4c64e79, subnet-095ba061c360a8e4f]  (privadas)
+node i-0e044fd4ff6d0d9dc  privateIp=10.20.11.81  publicIp=null  az=us-east-1b
 ```
 
-Archivo: [`infra/evidence/eks-nodes-d3.txt`](./evidence/eks-nodes-d3.txt)
+Captura `kubectl get nodes -o wide` (opcional, desde una red que alcance EKS): `infra/evidence/eks-nodes-d3.png`.
 

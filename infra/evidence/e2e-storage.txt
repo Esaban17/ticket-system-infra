@@ -1,0 +1,16 @@
+## Deliverable D — object written to S3 by POST /v1/tickets (AWS CLI listing; console screenshot equivalent)
+Key: uploads/2026-06-08T06-18-07-400Z-3afb1f0f-7d2d-49ab-ac4e-d52aa913c182.json
+
+2026-06-08 00:18:08         59 2026-06-08T06-18-07-400Z-3afb1f0f-7d2d-49ab-ac4e-d52aa913c182.json
+
+## head-object:
+{
+    "AcceptRanges": "bytes",
+    "LastModified": "2026-06-08T06:18:08+00:00",
+    "ContentLength": 59,
+    "ETag": "\"0f2493ecef49c1c984e2b835aed87432\"",
+    "VersionId": "h53DDke2gSIs6k0aDUFuv3uDqbpxltKM",
+    "ContentType": "application/json",
+    "ServerSideEncryption": "AES256",
+    "Metadata": {}
+}

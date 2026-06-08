@@ -90,9 +90,17 @@ placeholder. Delivery 3 refactors all of them onto the dedicated VPC:
   attached to RDS via `var.security_group_ids`. The old per-module DB SG and the
   `app_security_group_id` input were removed.
 
-A live `terraform output` excerpt (new VPC ID + subnet IDs) is rendered in
-`infra/README.md` under **## Evidence** and saved at
-`infra/evidence/network-foundation.txt`.
+Live `terraform output` excerpt after the D3 apply (full file:
+`infra/evidence/network-foundation.txt`, also rendered in `infra/README.md`):
+
+```text
+vpc_id             = "vpc-06883c7ea728434d5"          # dedicated VPC (was default VPC)
+vpc_cidr           = "10.20.0.0/16"
+public_subnet_ids  = ["subnet-03783df4a113bed6f", "subnet-05dff2dabee355dfe"]
+private_subnet_ids = ["subnet-095ba061c360a8e4f", "subnet-01fc32691e4c64e79"]
+nat_gateway_ids    = ["nat-0e792b33f49a6ec43"]
+database_endpoint  = "ticket-system-dev-pg.cqrs6muw4h2e.us-east-1.rds.amazonaws.com:5432"
+```
 
 ---
 
@@ -146,10 +154,12 @@ All ports/CIDRs/protocol are input variables with descriptions
   Terraform variable is declared `sensitive = true`; no `.tfvars` contains it.
 - **Non-secret config:** `AWS_REGION`, `AWS_S3_BUCKET_ATTACHMENTS`, `PORT`,
   `LOG_LEVEL`, `NODE_ENV` flow through `var.*` → a Kubernetes **ConfigMap**.
-- **IAM (least privilege):** the app pods assume an **IRSA** role
-  (`<cluster>-app`) whose only permissions are `s3:PutObject`, `s3:GetObject` on
-  **`<bucket-arn>/*`** and `s3:ListBucket` on **`<bucket-arn>`** — no wildcard
-  resource. Database access uses password auth over the private network
+- **IAM (least privilege):** the app pods assume the **IRSA** role
+  `ticket-system-dev-eks-app` (policy `ticket-system-dev-eks-app-s3`) whose only
+  permissions are `s3:PutObject`/`s3:GetObject` on
+  **`arn:aws:s3:::ticket-system-dev-attachments-galileo-pdds/*`** and
+  `s3:ListBucket` on **`arn:aws:s3:::ticket-system-dev-attachments-galileo-pdds`**
+  — no wildcard resource. Database access uses password auth over the private network
   (db-sg ← app-sg), not IAM. The ALB Controller uses its own IRSA role
   (`<cluster>-alb-controller`).
 - **Seed mechanism (committed, reproducible):** Prisma migration
