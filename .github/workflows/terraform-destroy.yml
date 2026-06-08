@@ -1,0 +1,56 @@
+name: Terraform Destroy
+
+# Manual teardown of the dev stack. Runs from GitHub's network, which CAN reach
+# the EKS API endpoint, so `terraform destroy` removes the Kubernetes Ingress
+# first — letting the AWS Load Balancer Controller delete its ALB cleanly —
+# before destroying the cluster and the rest of the AWS resources. A local
+# destroy cannot do this when the EKS endpoint is firewalled.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "destroy" to confirm tearing down the dev stack'
+        required: true
+        default: ""
+
+# Share the apply concurrency group so a destroy never overlaps an apply.
+concurrency:
+  group: terraform-apply-dev
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    name: Destroy (dev)
+    # Safety gate: only run when the operator typed exactly "destroy".
+    if: ${{ github.event.inputs.confirm == 'destroy' }}
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    env:
+      TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.8"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: infra/
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve -var-file=envs/dev/dev.tfvars
+        working-directory: infra/
