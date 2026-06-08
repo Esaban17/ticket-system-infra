@@ -108,7 +108,7 @@ flowchart TB
         subgraph Async["Capa asíncrona · servicios regionales AWS"]
             SQSnotif[["SQS Standard\nticket-notifications"]]
             SQSdlq[["SQS DLQ\nticket-notifications-dlq"]]
-            EB{{EventBridge Scheduler\ncron rate(5 minutes)}}
+            EB["EventBridge Scheduler\ncron rate(5 min)"]
         end
 
         subgraph Endpoints["VPC endpoints"]
