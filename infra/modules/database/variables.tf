@@ -24,14 +24,14 @@ variable "subnet_ids" {
   }
 }
 
-variable "vpc_id" {
-  description = "VPC where the database Security Group is created."
-  type        = string
-}
+variable "security_group_ids" {
+  description = "Security Group IDs attached to the RDS instance. In Delivery 3 this is the db-sg from the security module, whose only ingress is from app-sg on the Postgres port (no 0.0.0.0/0). Passing the SGs in (instead of creating one here) keeps all tiered SG-to-SG rules in the security module."
+  type        = list(string)
 
-variable "app_security_group_id" {
-  description = "Security Group ID of the application tier (Lambda or EKS nodes). Database ingress on the Postgres port is restricted to this SG only — NEVER 0.0.0.0/0."
-  type        = string
+  validation {
+    condition     = length(var.security_group_ids) >= 1
+    error_message = "Provide at least one security group ID (the db-sg) for the RDS instance."
+  }
 }
 
 variable "instance_class" {

@@ -13,11 +13,6 @@ output "port" {
   value       = aws_db_instance.this.port
 }
 
-output "db_security_group_id" {
-  description = "ID of the Security Group attached to the RDS instance. Exposed for reference; the only ingress rule is sourced from the application SG passed in via app_security_group_id."
-  value       = aws_security_group.db.id
-}
-
 output "db_name" {
   description = "Name of the initial database. Used as part of connection strings."
   value       = aws_db_instance.this.db_name

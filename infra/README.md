@@ -244,4 +244,88 @@ Screenshot de `kubectl get nodes -o wide` con al menos un nodo en `STATUS Ready`
 
 ![EKS nodes ready](./evidence/eks-nodes.png)
 
+---
+
+## Evidence — Delivery 3 (Networking Layer)
+
+Comandos de captura en [`infra/evidence/capture-delivery-3.sh`](./evidence/capture-delivery-3.sh).
+Resumen escrito en [`infra/docs/delivery-3-summary.md`](./docs/delivery-3-summary.md).
+
+### Deliverable A — Network Foundation (`terraform output`)
+
+VPC ID, subnets públicas/privadas y NAT Gateway provisionados por `module.network`:
+
+```text
+$(< infra/evidence/network-foundation.txt)
+```
+
+Archivo: [`infra/evidence/network-foundation.txt`](./evidence/network-foundation.txt)
+
+### Deliverable B — Network Security (Security Groups + NACLs)
+
+Extracto del `terraform plan` con las reglas SG-to-SG (web-sg → app-sg → db-sg):
+
+```text
+$(< infra/evidence/security-groups-plan.txt)
+```
+
+Archivo: [`infra/evidence/security-groups-plan.txt`](./evidence/security-groups-plan.txt)
+
+Screenshot de las reglas inbound/outbound en la consola:
+
+![Security groups](./evidence/security-groups.png)
+
+### Deliverable C — Public Ingress (ALB)
+
+`curl -v` contra la URL pública del ALB (Ingress → ClusterIP Service → pods):
+
+```text
+$(< infra/evidence/ingress-curl.txt)
+```
+
+Archivo: [`infra/evidence/ingress-curl.txt`](./evidence/ingress-curl.txt)
+
+Screenshot del ALB / target group con targets `healthy`:
+
+![Ingress healthy](./evidence/ingress-healthy.png)
+
+### Deliverable D — End-to-End Connectivity Proof
+
+`GET /v1/tickets` devolviendo datos leídos de RDS (no hardcodeados):
+
+```text
+$(< infra/evidence/e2e-get.txt)
+```
+
+`POST /v1/tickets` devolviendo `HTTP 201` con la object key escrita en S3:
+
+```text
+$(< infra/evidence/e2e-post.txt)
+```
+
+Archivos: [`e2e-get.txt`](./evidence/e2e-get.txt) · [`e2e-post.txt`](./evidence/e2e-post.txt)
+
+Screenshot del objeto nuevo visible en el bucket S3:
+
+![E2E storage object](./evidence/e2e-storage.png)
+
+### Deliverable E — CI Pipeline (plan on PR)
+
+Screenshot del workflow `Terraform CI` con el plan publicado como comentario en el PR:
+
+![CI plan comment](./evidence/ci-plan.png)
+
+PR de ejemplo: _(enlace al PR de Delivery 3 en GitHub)_
+
+### Deliverable F — EKS nodes in private subnets
+
+`kubectl get nodes -o wide` mostrando ≥1 nodo `Ready` con IP en subred privada (`10.20.10.x` / `10.20.11.x`):
+
+![EKS nodes D3](./evidence/eks-nodes-d3.png)
+
+```text
+$(< infra/evidence/eks-nodes-d3.txt)
+```
+
+Archivo: [`infra/evidence/eks-nodes-d3.txt`](./evidence/eks-nodes-d3.txt)
 

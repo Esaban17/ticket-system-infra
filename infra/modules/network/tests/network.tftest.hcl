@@ -224,8 +224,29 @@ run "nat_gateway_declared" {
   command = plan
 
   assert {
-    condition     = aws_nat_gateway.this != null
-    error_message = "El módulo debe declarar un NAT Gateway"
+    condition     = length(aws_nat_gateway.this) == 1
+    error_message = "Con single_nat_gateway = true (default) debe declararse exactamente 1 NAT Gateway"
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Run 10b: NAT topology per-AZ — single_nat_gateway = false crea 1 NAT por AZ
+# ---------------------------------------------------------------------------
+run "nat_gateway_per_az" {
+  command = plan
+
+  variables {
+    single_nat_gateway = false
+  }
+
+  assert {
+    condition     = length(aws_nat_gateway.this) == 2
+    error_message = "Con single_nat_gateway = false deben crearse 2 NAT Gateways (uno por AZ)"
+  }
+
+  assert {
+    condition     = length(aws_eip.nat) == 2
+    error_message = "Con single_nat_gateway = false deben crearse 2 EIPs (uno por NAT)"
   }
 }
 

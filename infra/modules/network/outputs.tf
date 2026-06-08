@@ -23,14 +23,14 @@ output "private_subnet_ids" {
   value       = aws_subnet.private[*].id
 }
 
-output "nat_gateway_id" {
-  description = "ID of the single NAT Gateway. Exposed for observability/inspection — note that NAT HA is intentionally not provided (see gateways.tf header)."
-  value       = aws_nat_gateway.this.id
+output "nat_gateway_ids" {
+  description = "IDs of the NAT Gateway(s) — a single-element list when single_nat_gateway = true, one ID per AZ otherwise. Required by the rubric (outputs must include nat_gateway_ids)."
+  value       = aws_nat_gateway.this[*].id
 }
 
-output "nat_eip" {
-  description = "Elastic IP address allocated to the NAT Gateway. Useful when egress traffic needs to be allow-listed by external services."
-  value       = aws_eip.nat.public_ip
+output "nat_public_ips" {
+  description = "Elastic IP address(es) allocated to the NAT Gateway(s). Useful when egress traffic needs to be allow-listed by external services."
+  value       = aws_eip.nat[*].public_ip
 }
 
 output "vpc_endpoint_sg_id" {

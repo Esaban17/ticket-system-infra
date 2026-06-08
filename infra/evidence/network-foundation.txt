@@ -1,0 +1,33 @@
+app_security_group_id = "sg-081c3adb0338f8644"
+database_arn = "arn:aws:rds:us-east-1:203036352580:db:ticket-system-dev-pg"
+database_endpoint = "ticket-system-dev-pg.cqrs6muw4h2e.us-east-1.rds.amazonaws.com:5432"
+db_security_group_id = "sg-0594086c02bf0a0cd"
+ecr_repository_arn = "arn:aws:ecr:us-east-1:203036352580:repository/ticket-system-api"
+ecr_repository_name = "ticket-system-api"
+ecr_repository_url = "203036352580.dkr.ecr.us-east-1.amazonaws.com/ticket-system-api"
+eks_cluster_arn = "arn:aws:eks:us-east-1:203036352580:cluster/ticket-system-dev-eks"
+eks_cluster_endpoint = "https://4983D5BEE7BC08796D67C54FCB9424BC.gr7.us-east-1.eks.amazonaws.com"
+eks_cluster_name = "ticket-system-dev-eks"
+eks_cluster_security_group_id = "sg-0dd471fb273761ff0"
+nat_gateway_ids = [
+  "nat-0e792b33f49a6ec43",
+]
+nat_public_ips = [
+  "18.205.146.120",
+]
+private_subnet_ids = [
+  "subnet-095ba061c360a8e4f",
+  "subnet-01fc32691e4c64e79",
+]
+public_subnet_ids = [
+  "subnet-03783df4a113bed6f",
+  "subnet-05dff2dabee355dfe",
+]
+region = "us-east-1"
+tickets_bucket_arn = "arn:aws:s3:::ticket-system-dev-attachments-galileo-pdds"
+tickets_bucket_name = "ticket-system-dev-attachments-galileo-pdds"
+vpc_cidr = "10.20.0.0/16"
+vpc_id = "vpc-06883c7ea728434d5"
+web_security_group_id = "sg-019d0daf1c622a830"
+worker_lambda_arn = "arn:aws:lambda:us-east-1:203036352580:function:ticket-system-dev-worker"
+worker_lambda_name = "ticket-system-dev-worker"

@@ -43,24 +43,10 @@ resource "aws_db_parameter_group" "this" {
 }
 
 # ---- Security group -------------------------------------------------------
-# Ingress on port 5432 ONLY from the application tier security group.
-# No CIDR-based ingress. Egress is closed to keep blast radius small.
-
-resource "aws_security_group" "db" {
-  name        = "${local.name_prefix}-db-sg"
-  description = "RDS ingress restricted to the application security group on Postgres port"
-  vpc_id      = var.vpc_id
-}
-
-resource "aws_security_group_rule" "db_ingress_from_app" {
-  type                     = "ingress"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.db.id
-  source_security_group_id = var.app_security_group_id
-  description              = "Allow Postgres ingress ONLY from the application security group"
-}
+# db-sg is owned by the security module (Deliverable B) so every tiered
+# SG-to-SG rule lives in one place. Its only ingress is from app-sg on the
+# Postgres port; it has no egress and no 0.0.0.0/0 ingress. It is attached to
+# the instance via var.security_group_ids below.
 
 # ---- RDS instance ---------------------------------------------------------
 
@@ -77,7 +63,7 @@ resource "aws_db_instance" "this" {
   password               = var.db_password
   db_subnet_group_name   = aws_db_subnet_group.this.name
   parameter_group_name   = aws_db_parameter_group.this.name
-  vpc_security_group_ids = [aws_security_group.db.id]
+  vpc_security_group_ids = var.security_group_ids
   multi_az               = var.multi_az
   publicly_accessible    = false
   skip_final_snapshot    = var.environment == "dev"

@@ -5,6 +5,13 @@
 # → database SG ingress) or re-exported here at the root.
 # ---------------------------------------------------------------------------
 
+# ---- Meta -----------------------------------------------------------------
+
+output "region" {
+  description = "AWS region the stack is deployed in. Used by the evidence-capture script and by `aws eks update-kubeconfig`."
+  value       = var.region
+}
+
 # ---- Network --------------------------------------------------------------
 
 output "vpc_id" {
@@ -27,9 +34,14 @@ output "private_subnet_ids" {
   value       = module.network.private_subnet_ids
 }
 
-output "nat_eip" {
-  description = "Elastic IP of the NAT Gateway. Useful for external allow-lists."
-  value       = module.network.nat_eip
+output "nat_gateway_ids" {
+  description = "IDs of the NAT Gateway(s) provisioned by the network module (single shared NAT in dev, one per AZ when single_nat_gateway = false)."
+  value       = module.network.nat_gateway_ids
+}
+
+output "nat_public_ips" {
+  description = "Elastic IP(s) of the NAT Gateway(s). Useful for external allow-lists."
+  value       = module.network.nat_public_ips
 }
 
 # ---- Storage --------------------------------------------------------------
@@ -100,4 +112,38 @@ output "eks_cluster_endpoint" {
 output "eks_cluster_arn" {
   description = "ARN of the EKS cluster."
   value       = module.eks.cluster_arn
+}
+
+output "eks_cluster_security_group_id" {
+  description = "Security group ID of the EKS cluster control plane (Deliverable F output)."
+  value       = module.eks.cluster_security_group_id
+}
+
+# ---- Security (Deliverable B) ---------------------------------------------
+
+output "web_security_group_id" {
+  description = "ID of web-sg (public/ALB tier)."
+  value       = module.security.web_sg_id
+}
+
+output "app_security_group_id" {
+  description = "ID of app-sg (application/EKS-node tier)."
+  value       = module.security.app_sg_id
+}
+
+output "db_security_group_id" {
+  description = "ID of db-sg (database/RDS tier)."
+  value       = module.security.db_sg_id
+}
+
+# ---- Ingress (Deliverable C) ----------------------------------------------
+
+output "ingress_url" {
+  description = "Public URL of the application, served by the ALB provisioned by the Kubernetes Ingress (Deliverable C). Empty until the ALB Controller finishes provisioning the load balancer."
+  value       = module.ingress.ingress_url
+}
+
+output "ingress_hostname" {
+  description = "DNS hostname of the ALB created by the Kubernetes Ingress."
+  value       = module.ingress.ingress_hostname
 }

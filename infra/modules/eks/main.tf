@@ -46,6 +46,15 @@ module "eks" {
       desired_size   = var.node_desired_size
       instance_types = var.node_instance_types
 
+      # Deliverable F: the node group lives ONLY in the private subnets (no
+      # public IPs). This overrides the cluster-level subnet_ids (which also
+      # lists the public subnets for ALB placement) for this node group.
+      subnet_ids = var.subnet_ids
+
+      # Attach app-sg (in addition to the cluster/node managed SGs) so pods
+      # inherit the web-sg→app-sg ingress and app-sg→db-sg egress paths.
+      vpc_security_group_ids = var.node_security_group_ids
+
       labels = {
         environment = var.environment
         role        = "general"

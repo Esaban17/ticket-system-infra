@@ -41,6 +41,26 @@ variable "tickets_bucket_suffix" {
   default     = "galileo-pdds"
 }
 
+# ---- Application / ingress ports ------------------------------------------
+
+variable "app_port" {
+  description = "TCP port the application container (NestJS API) listens on inside the pod. Drives the web-sg→app-sg→pod path and the Ingress target port. No port number is hardcoded in the security or ingress modules — they read this."
+  type        = number
+  default     = 8080
+}
+
+variable "db_port" {
+  description = "TCP port PostgreSQL listens on. Drives the app-sg→db-sg rule and the RDS connection string."
+  type        = number
+  default     = 5432
+}
+
+variable "health_check_path" {
+  description = "HTTP path the ALB target group uses for health checks against the app pods (rubric: configurable health check path). The NestJS API exposes '/healthz' outside the /v1 prefix."
+  type        = string
+  default     = "/healthz"
+}
+
 # ---- Compute (Lambda) ----------------------------------------------------
 
 variable "lambda_memory_size" {
@@ -69,6 +89,12 @@ variable "db_multi_az" {
   default     = false
 }
 
+variable "db_username" {
+  description = "Master username for the RDS instance and the username embedded in the app's DATABASE_URL. Not a secret (visible via the RDS API). Kept as a variable so the database module and the ingress module use the same value."
+  type        = string
+  default     = "ticket_admin"
+}
+
 variable "db_password" {
   description = "Master password for the RDS instance. MUST be provided via the TF_VAR_db_password environment variable — never via .tfvars or .tf files committed to git."
   type        = string
@@ -78,6 +104,12 @@ variable "db_password" {
     condition     = length(var.db_password) >= 12
     error_message = "db_password must be at least 12 characters long."
   }
+}
+
+variable "api_image_tag" {
+  description = "Tag of the ticket-system API container image (in ECR) deployed to EKS. The build step pushes this tag before the ingress module is applied."
+  type        = string
+  default     = "d3"
 }
 
 # ---- EKS (Optional Track 1) ----------------------------------------------
