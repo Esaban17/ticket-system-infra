@@ -36,9 +36,12 @@ COPY src/ ./src/
 
 RUN npm run build
 
-# Eliminar devDependencies para el stage runtime
-# npm ci --omit=dev reinstala solo las deps de producción limpiamente
-RUN npm ci --omit=dev --prefer-offline
+# Eliminar devDependencies para el stage runtime.
+# npm ci --omit=dev reinstala solo las deps de producción, lo que BORRA el
+# cliente Prisma generado arriba. Como `prisma` ahora es dependencia de
+# producción, lo regeneramos para que el cliente exista en el node_modules de
+# runtime (lo consumen tanto la app como el Job de seed `node dist/seed.js`).
+RUN npm ci --omit=dev --prefer-offline && npx prisma generate
 
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
@@ -79,4 +82,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD node -e "require('http').get('http://localhost:8080/healthz', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
 
 # Punto de entrada
-CMD ["dist/main.js"]
+CMD ["node", "dist/main.js"]

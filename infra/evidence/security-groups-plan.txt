@@ -1,0 +1,386 @@
+############ TERRAFORM STATE — tiered security groups + rules ############
+==== module.security.aws_security_group.web ====
+# module.security.aws_security_group.web:
+resource "aws_security_group" "web" {
+    description            = "Web/ALB tier: HTTP+HTTPS from the internet, egress to the app tier only."
+    egress                 = [
+        {
+            cidr_blocks      = []
+            description      = "ALB forwards/health-checks the app tier on the application port only."
+            from_port        = 8080
+            ipv6_cidr_blocks = []
+            prefix_list_ids  = []
+            protocol         = "tcp"
+            security_groups  = [
+                "sg-081c3adb0338f8644",
+            ]
+            self             = false
+            to_port          = 8080
+    ]
+    ingress                = [
+        {
+            cidr_blocks      = [
+                "0.0.0.0/0",
+            ]
+            description      = "HTTP from the internet to the ALB."
+            from_port        = 80
+            ipv6_cidr_blocks = []
+            prefix_list_ids  = []
+            protocol         = "tcp"
+            security_groups  = []
+            self             = false
+            to_port          = 80
+        {
+            cidr_blocks      = [
+                "0.0.0.0/0",
+            ]
+            description      = "HTTPS from the internet to the ALB (TLS termination arrives in Delivery 5)."
+            from_port        = 443
+            ipv6_cidr_blocks = []
+            prefix_list_ids  = []
+            protocol         = "tcp"
+            security_groups  = []
+            self             = false
+            to_port          = 443
+    ]
+    name                   = "ticket-system-dev-web-sg"
+    name_prefix            = [90mnull[0m[0m
+    revoke_rules_on_delete = false
+    tags                   = {
+        "Environment" = "dev"
+        "Module"      = "security"
+        "Name"        = "ticket-system-dev-web-sg"
+        "Tier"        = "web"
+        "Environment" = "dev"
+        "ManagedBy"   = "terraform"
+        "Module"      = "security"
+        "Name"        = "ticket-system-dev-web-sg"
+        "Project"     = "ticket-system"
+        "Tier"        = "web"
+    vpc_id                 = "vpc-06883c7ea728434d5"
+==== module.security.aws_security_group.app ====
+# module.security.aws_security_group.app:
+resource "aws_security_group" "app" {
+    description            = "App tier (EKS nodes): ingress from web-sg on the app port only, egress to db-sg on the db port only."
+    egress                 = [
+        {
+            cidr_blocks      = []
+            description      = "App tier reaches the database tier on the db port only."
+            from_port        = 5432
+            ipv6_cidr_blocks = []
+            prefix_list_ids  = []
+            protocol         = "tcp"
+            security_groups  = [
+                "sg-0594086c02bf0a0cd",
+            ]
+            self             = false
+            to_port          = 5432
+    ]
+    ingress                = [
+        {
+            cidr_blocks      = []
+            description      = "Application traffic + ALB health checks, accepted only from the web/ALB tier."
+            from_port        = 8080
+            ipv6_cidr_blocks = []
+            prefix_list_ids  = []
+            protocol         = "tcp"
+            security_groups  = [
+                "sg-019d0daf1c622a830",
+            ]
+            self             = false
+            to_port          = 8080
+    ]
+    name                   = "ticket-system-dev-app-sg"
+    name_prefix            = [90mnull[0m[0m
+    revoke_rules_on_delete = false
+    tags                   = {
+        "Environment" = "dev"
+        "Module"      = "security"
+        "Name"        = "ticket-system-dev-app-sg"
+        "Tier"        = "app"
+        "Environment" = "dev"
+        "ManagedBy"   = "terraform"
+        "Module"      = "security"
+        "Name"        = "ticket-system-dev-app-sg"
+        "Project"     = "ticket-system"
+        "Tier"        = "app"
+    vpc_id                 = "vpc-06883c7ea728434d5"
+==== module.security.aws_security_group.db ====
+# module.security.aws_security_group.db:
+resource "aws_security_group" "db" {
+    description            = "Database tier (RDS): ingress from app-sg on the db port only, no egress, no 0.0.0.0/0 ingress."
+    egress                 = []
+    ingress                = [
+        {
+            cidr_blocks      = []
+            description      = "Postgres ingress accepted ONLY from the app tier security group."
+            from_port        = 5432
+            ipv6_cidr_blocks = []
+            prefix_list_ids  = []
+            protocol         = "tcp"
+            security_groups  = [
+                "sg-081c3adb0338f8644",
+            ]
+            self             = false
+            to_port          = 5432
+    ]
+    name                   = "ticket-system-dev-db-sg"
+    name_prefix            = [90mnull[0m[0m
+    revoke_rules_on_delete = false
+    tags                   = {
+        "Environment" = "dev"
+        "Module"      = "security"
+        "Name"        = "ticket-system-dev-db-sg"
+        "Tier"        = "db"
+        "Environment" = "dev"
+        "ManagedBy"   = "terraform"
+        "Module"      = "security"
+        "Name"        = "ticket-system-dev-db-sg"
+        "Project"     = "ticket-system"
+        "Tier"        = "db"
+    vpc_id                 = "vpc-06883c7ea728434d5"
+==== module.security.aws_security_group_rule.web_ingress_http ====
+# module.security.aws_security_group_rule.web_ingress_http:
+resource "aws_security_group_rule" "web_ingress_http" {
+    cidr_blocks            = [
+        "0.0.0.0/0",
+    ]
+    description            = "HTTP from the internet to the ALB."
+    from_port              = 80
+    protocol               = "tcp"
+    security_group_id      = "sg-019d0daf1c622a830"
+    security_group_rule_id = "sgr-0dea990d8c9bf71ce"
+    self                   = false
+    to_port                = 80
+    type                   = "ingress"
+==== module.security.aws_security_group_rule.web_ingress_https ====
+# module.security.aws_security_group_rule.web_ingress_https:
+resource "aws_security_group_rule" "web_ingress_https" {
+    cidr_blocks            = [
+        "0.0.0.0/0",
+    ]
+    description            = "HTTPS from the internet to the ALB (TLS termination arrives in Delivery 5)."
+    from_port              = 443
+    protocol               = "tcp"
+    security_group_id      = "sg-019d0daf1c622a830"
+    security_group_rule_id = "sgr-0ec8c3c40f46b0d98"
+    self                   = false
+    to_port                = 443
+    type                   = "ingress"
+==== module.security.aws_security_group_rule.web_egress_to_app ====
+# module.security.aws_security_group_rule.web_egress_to_app:
+resource "aws_security_group_rule" "web_egress_to_app" {
+    description              = "ALB forwards/health-checks the app tier on the application port only."
+    from_port                = 8080
+    protocol                 = "tcp"
+    security_group_id        = "sg-019d0daf1c622a830"
+    security_group_rule_id   = "sgr-05eca84124abeebd0"
+    self                     = false
+    source_security_group_id = "sg-081c3adb0338f8644"
+    to_port                  = 8080
+    type                     = "egress"
+==== module.security.aws_security_group_rule.app_ingress_from_web ====
+# module.security.aws_security_group_rule.app_ingress_from_web:
+resource "aws_security_group_rule" "app_ingress_from_web" {
+    description              = "Application traffic + ALB health checks, accepted only from the web/ALB tier."
+    from_port                = 8080
+    protocol                 = "tcp"
+    security_group_id        = "sg-081c3adb0338f8644"
+    security_group_rule_id   = "sgr-044c5e1840f6a510a"
+    self                     = false
+    source_security_group_id = "sg-019d0daf1c622a830"
+    to_port                  = 8080
+    type                     = "ingress"
+==== module.security.aws_security_group_rule.app_egress_to_db ====
+# module.security.aws_security_group_rule.app_egress_to_db:
+resource "aws_security_group_rule" "app_egress_to_db" {
+    description              = "App tier reaches the database tier on the db port only."
+    from_port                = 5432
+    protocol                 = "tcp"
+    security_group_id        = "sg-081c3adb0338f8644"
+    security_group_rule_id   = "sgr-02a1f4aff44026b5f"
+    self                     = false
+    source_security_group_id = "sg-0594086c02bf0a0cd"
+    to_port                  = 5432
+    type                     = "egress"
+==== module.security.aws_security_group_rule.db_ingress_from_app ====
+# module.security.aws_security_group_rule.db_ingress_from_app:
+resource "aws_security_group_rule" "db_ingress_from_app" {
+    description              = "Postgres ingress accepted ONLY from the app tier security group."
+    from_port                = 5432
+    protocol                 = "tcp"
+    security_group_id        = "sg-0594086c02bf0a0cd"
+    security_group_rule_id   = "sgr-0fb4588d622ba720e"
+    self                     = false
+    source_security_group_id = "sg-081c3adb0338f8644"
+    to_port                  = 5432
+    type                     = "ingress"
+[
+    {
+        "Name": "ticket-system-dev-app-sg",
+        "Ingress": [
+            {
+                "p": 8080,
+                "src": [
+                    "sg-019d0daf1c622a830"
+                ],
+                "cidr": []
+            }
+        ]
+    },
+    {
+        "Name": "ticket-system-dev-web-sg",
+        "Ingress": [
+            {
+                "p": 80,
+                "src": [],
+                "cidr": [
+                    "0.0.0.0/0"
+                ]
+            },
+            {
+                "p": 443,
+                "src": [],
+                "cidr": [
+                    "0.0.0.0/0"
+                ]
+            }
+        ]
+    },
+    {
+        "Name": "ticket-system-dev-db-sg",
+        "Ingress": [
+            {
+                "p": 5432,
+                "src": [
+                    "sg-081c3adb0338f8644"
+                ],
+                "cidr": []
+            }
+        ]
+    }
+]
+
+############ NETWORK ACLs (public + private) ############
+[
+    {
+        "id": "acl-0978b12e0c4522dd9",
+        "tags": "ticket-system-dev-nacl-public",
+        "entries": [
+            {
+                "rule": 100,
+                "egress": true,
+                "proto": "-1",
+                "action": "allow",
+                "cidr": "0.0.0.0/0",
+                "ports": null
+            },
+            {
+                "rule": 32767,
+                "egress": true,
+                "proto": "-1",
+                "action": "deny",
+                "cidr": "0.0.0.0/0",
+                "ports": null
+            },
+            {
+                "rule": 100,
+                "egress": false,
+                "proto": "6",
+                "action": "allow",
+                "cidr": "0.0.0.0/0",
+                "ports": {
+                    "From": 80,
+                    "To": 80
+                }
+            },
+            {
+                "rule": 110,
+                "egress": false,
+                "proto": "6",
+                "action": "allow",
+                "cidr": "0.0.0.0/0",
+                "ports": {
+                    "From": 443,
+                    "To": 443
+                }
+            },
+            {
+                "rule": 120,
+                "egress": false,
+                "proto": "6",
+                "action": "allow",
+                "cidr": "0.0.0.0/0",
+                "ports": {
+                    "From": 1024,
+                    "To": 65535
+                }
+            },
+            {
+                "rule": 130,
+                "egress": false,
+                "proto": "-1",
+                "action": "allow",
+                "cidr": "10.20.0.0/16",
+                "ports": null
+            },
+            {
+                "rule": 32767,
+                "egress": false,
+                "proto": "-1",
+                "action": "deny",
+                "cidr": "0.0.0.0/0",
+                "ports": null
+            }
+        ]
+    },
+    {
+        "id": "acl-0b76da9a2110fbb68",
+        "tags": "ticket-system-dev-nacl-private",
+        "entries": [
+            {
+                "rule": 100,
+                "egress": true,
+                "proto": "-1",
+                "action": "allow",
+                "cidr": "0.0.0.0/0",
+                "ports": null
+            },
+            {
+                "rule": 32767,
+                "egress": true,
+                "proto": "-1",
+                "action": "deny",
+                "cidr": "0.0.0.0/0",
+                "ports": null
+            },
+            {
+                "rule": 100,
+                "egress": false,
+                "proto": "-1",
+                "action": "allow",
+                "cidr": "10.20.0.0/16",
+                "ports": null
+            },
+            {
+                "rule": 110,
+                "egress": false,
+                "proto": "6",
+                "action": "allow",
+                "cidr": "0.0.0.0/0",
+                "ports": {
+                    "From": 1024,
+                    "To": 65535
+                }
+            },
+            {
+                "rule": 32767,
+                "egress": false,
+                "proto": "-1",
+                "action": "deny",
+                "cidr": "0.0.0.0/0",
+                "ports": null
+            }
+        ]
+    }
+]

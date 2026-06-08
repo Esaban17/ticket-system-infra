@@ -1,0 +1,26 @@
+## Deliverable F — EKS nodes in PRIVATE subnets (captured via AWS API; the EKS API endpoint is unreachable from the build network, so kubectl could not be used).
+
+### Managed node group subnets (must be the private subnets):
+{
+    "subnets": [
+        "subnet-01fc32691e4c64e79",
+        "subnet-095ba061c360a8e4f"
+    ],
+    "status": "ACTIVE",
+    "scaling": {
+        "minSize": 1,
+        "maxSize": 2,
+        "desiredSize": 1
+    }
+}
+
+### Node EC2 instances (PrivateIp in 10.20.10/11, PublicIp must be null):
+[
+    {
+        "id": "i-0e044fd4ff6d0d9dc",
+        "privateIp": "10.20.11.81",
+        "publicIp": null,
+        "subnet": "subnet-01fc32691e4c64e79",
+        "az": "us-east-1b"
+    }
+]

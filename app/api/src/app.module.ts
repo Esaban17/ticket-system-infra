@@ -6,6 +6,9 @@ import { configuration } from '@/config/configuration';
 import { validate } from '@/config/env.validation';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { LoggingInterceptor } from '@/common/interceptors/logging.interceptor';
+import { PrismaModule } from '@/prisma/prisma.module';
+import { TicketsModule } from '@/tickets/tickets.module';
+import { HealthController } from '@/health/health.controller';
 
 /**
  * Módulo raíz de la aplicación.
@@ -30,8 +33,13 @@ import { LoggingInterceptor } from '@/common/interceptors/logging.interceptor';
       cache: true,
     }),
 
-    // TODO (BL-002 — Luis André): importar HealthcheckModule aquí
-    // TODO (EP-02): importar módulos de negocio a medida que se implementen
+    // Delivery 3: persistence + the end-to-end proof resource.
+    PrismaModule,
+    TicketsModule,
+  ],
+  controllers: [
+    // Liveness/readiness probes for the ALB target group (outside /v1 prefix).
+    HealthController,
   ],
   providers: [
     // Filtro global de excepciones HTTP

@@ -1,0 +1,70 @@
+name: Terraform Apply
+
+# Apply-on-merge (Deliverable E): when a PR is merged to main, provision the
+# networking + ingress changes. Plan-on-PR lives in terraform-ci.yml.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - ".github/workflows/terraform-apply.yml"
+
+# Never run two applies against the same remote state at once.
+concurrency:
+  group: terraform-apply-dev
+  cancel-in-progress: false
+
+jobs:
+  terraform-apply:
+    name: Apply (dev)
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    env:
+      # Sensitive value injected as TF_VAR_* — never committed (rubric).
+      TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.8"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: infra/
+
+      # Dependency order (documented in infra/docs/delivery-3-summary.md):
+      # the Kubernetes/Helm providers authenticate against the EKS cluster, so
+      # the cluster + its prerequisites must exist before the in-cluster
+      # resources (ALB Controller, app, Ingress) can be planned/applied.
+      # Phase 1 builds the AWS infrastructure (network → security → eks, etc.).
+      - name: Apply infrastructure (network, security, eks, ...)
+        run: |
+          terraform apply -auto-approve -var-file=envs/dev/dev.tfvars \
+            -target=module.network \
+            -target=module.security \
+            -target=module.storage \
+            -target=module.registry \
+            -target=module.compute \
+            -target=module.database \
+            -target=module.eks
+        working-directory: infra/
+
+      # Phase 2 applies everything, adding the in-cluster resources now that the
+      # cluster is reachable (ALB Controller Helm release + app + Ingress).
+      - name: Apply full stack (alb_controller, ingress)
+        run: terraform apply -auto-approve -var-file=envs/dev/dev.tfvars
+        working-directory: infra/

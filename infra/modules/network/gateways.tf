@@ -1,17 +1,17 @@
 # ---------------------------------------------------------------------------
 # BL-108 — Internet Gateway, NAT Gateway, default routes.
 #
-# Cost / HA trade-off:
-#   A single NAT Gateway is provisioned in the public subnet of the FIRST AZ
-#   (us-east-1a by default). Every private route table points its default
-#   route to that single NAT. This is intentionally NOT highly-available:
-#   if AZ-a fails, private subnets in AZ-b lose egress.
+# Cost / HA trade-off (now controlled by var.single_nat_gateway):
+#   single_nat_gateway = true  → one shared NAT Gateway in the public subnet of
+#     the FIRST AZ. Every private route table points its default route to it.
+#     Cheaper (~33 USD/month) but NOT highly-available: if AZ-a fails, private
+#     subnets in other AZs lose egress.
+#   single_nat_gateway = false → one NAT Gateway per AZ, each in that AZ's
+#     public subnet; each private route table points to its AZ-local NAT.
+#     Highly available, ~one NAT bill per AZ.
 #
-#   Rationale: a NAT Gateway costs ~33 USD/month + processed-GB. Doubling it
-#   for HA in a course project is ~50% of the platform's monthly bill for a
-#   benefit we cannot exercise (we never simulate an AZ outage). When this
-#   stack moves to production, swap `count = 1` for `count = local.az_count`
-#   in aws_nat_gateway.this and update the route below to index by AZ.
+#   local.nat_count (main.tf) resolves the toggle to 1 or az_count; the route
+#   below indexes the NAT by AZ when per-AZ, or pins to NAT[0] when shared.
 # ---------------------------------------------------------------------------
 
 # ---- Internet Gateway -----------------------------------------------------
@@ -33,10 +33,11 @@ resource "aws_route" "public_default" {
 # ---- NAT Gateway (single AZ on purpose — see header) ---------------------
 
 resource "aws_eip" "nat" {
+  count  = local.nat_count
   domain = "vpc"
 
   tags = merge(local.common_tags, {
-    Name = "${var.name_prefix}-nat-eip"
+    Name = "${var.name_prefix}-nat-eip-${count.index}"
   })
 
   # Per AWS docs, an EIP used by a NAT Gateway must be created before the
@@ -45,22 +46,25 @@ resource "aws_eip" "nat" {
 }
 
 resource "aws_nat_gateway" "this" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[0].id
+  count = local.nat_count
+
+  allocation_id = aws_eip.nat[count.index].id
+  subnet_id     = aws_subnet.public[count.index].id
 
   tags = merge(local.common_tags, {
-    Name = "${var.name_prefix}-nat"
+    Name = "${var.name_prefix}-nat-${count.index}"
   })
 
   depends_on = [aws_internet_gateway.this]
 }
 
-# All private route tables share the same NAT. When/if we add a per-AZ NAT,
-# change `aws_nat_gateway.this.id` to `aws_nat_gateway.this[count.index].id`.
+# Each private route table sends its default route to a NAT Gateway. With a
+# single shared NAT every table points to NAT[0]; with per-AZ NAT each table
+# points to the NAT in its own AZ (min() clamps the index for the shared case).
 resource "aws_route" "private_default" {
   count = local.az_count
 
   route_table_id         = aws_route_table.private[count.index].id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.this.id
+  nat_gateway_id         = aws_nat_gateway.this[min(count.index, local.nat_count - 1)].id
 }

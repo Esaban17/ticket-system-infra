@@ -30,6 +30,12 @@ variable "public_subnet_ids" {
   default     = []
 }
 
+variable "node_security_group_ids" {
+  description = "Additional security group IDs attached to the managed node group ENIs (e.g., app-sg from the security module). Layered on top of the cluster/node SGs the EKS module manages."
+  type        = list(string)
+  default     = []
+}
+
 variable "node_min_size" {
   description = "Minimum number of nodes in the managed node group. Required by the rubric to be a variable, not a hardcoded value."
   type        = number

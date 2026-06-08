@@ -29,13 +29,22 @@
 locals {
   az_count = length(var.availability_zones)
 
-  # Carve subnets out of the VPC CIDR deterministically:
+  # Subnet CIDRs come from the input variables when provided, otherwise they
+  # are carved out of the VPC CIDR deterministically:
   #   public  AZ index 0..N-1  → 10.20.0.0/24, 10.20.1.0/24, ...
   #   private AZ index 0..N-1  → 10.20.10.0/24, 10.20.11.0/24, ...
-  # Offset of 10 between public and private leaves headroom to add a third
-  # subnet tier (e.g. DB-only) later without renumbering.
-  public_subnet_cidrs  = [for i in range(local.az_count) : cidrsubnet(var.vpc_cidr, 8, i)]
-  private_subnet_cidrs = [for i in range(local.az_count) : cidrsubnet(var.vpc_cidr, 8, i + 10)]
+  # The offset of 10 between public and private leaves headroom to add a third
+  # subnet tier (e.g. DB-only) later without renumbering. Passing
+  # var.public_subnet_cidrs / var.private_subnet_cidrs overrides the formula.
+  public_subnet_cidrs = length(var.public_subnet_cidrs) > 0 ? var.public_subnet_cidrs : [
+    for i in range(local.az_count) : cidrsubnet(var.vpc_cidr, 8, i)
+  ]
+  private_subnet_cidrs = length(var.private_subnet_cidrs) > 0 ? var.private_subnet_cidrs : [
+    for i in range(local.az_count) : cidrsubnet(var.vpc_cidr, 8, i + 10)
+  ]
+
+  # NAT count: one shared NAT when single_nat_gateway = true, else one per AZ.
+  nat_count = var.single_nat_gateway ? 1 : local.az_count
 
   cluster_tag = var.cluster_name == "" ? {} : {
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
