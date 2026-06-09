@@ -1,10 +1,23 @@
-import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Res,
+} from '@nestjs/common';
 import { Response } from 'express';
-import { User } from '@prisma/client';
+import { Role, User } from '@prisma/client';
 
 import { CurrentUser } from '@/auth/current-user.decorator';
+import { RequireRole } from '@/auth/roles.decorator';
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
+import { AssignTicketDto } from './dto/assign-ticket.dto';
+import { ChangeStateDto } from './dto/change-state.dto';
 
 /**
  * Endpoints de tickets (EP-03). Requieren JWT (el guard global de EP-07 aplica;
@@ -33,5 +46,27 @@ export class TicketsController {
   @Get(':id')
   getOne(@Param('id', new ParseUUIDPipe()) id: string, @CurrentUser() user: User) {
     return this.tickets.getForUser(id, user);
+  }
+
+  // POST /v1/tickets/:id/assign — asigna a un agente (BL-018). Reportante → 403 (RBAC).
+  @Post(':id/assign')
+  @RequireRole(Role.agente, Role.administrador)
+  assign(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: AssignTicketDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.tickets.assign(id, dto, user);
+  }
+
+  // PATCH /v1/tickets/:id/state — iniciar/resolver (BL-019/020). Reportante → 403.
+  @Patch(':id/state')
+  @RequireRole(Role.agente, Role.administrador)
+  changeState(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: ChangeStateDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.tickets.changeState(id, dto, user);
   }
 }
