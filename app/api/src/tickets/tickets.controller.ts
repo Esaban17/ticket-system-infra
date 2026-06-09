@@ -1,31 +1,37 @@
-import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Res } from '@nestjs/common';
+import { Response } from 'express';
+import { User } from '@prisma/client';
 
-import { Public } from '@/common/decorators/public.decorator';
-import { TicketsService, StoredObject } from './tickets.service';
+import { CurrentUser } from '@/auth/current-user.decorator';
+import { TicketsService } from './tickets.service';
+import { CreateTicketDto } from './dto/create-ticket.dto';
 
 /**
- * Delivery 3 end-to-end proof endpoints. With the global /v1 prefix these are
- * reachable at GET/POST /v1/tickets, exclusively through the ALB Ingress.
- *
- * Marcado @Public temporalmente: EP-03 reemplaza este controller por el de
- * creación de tickets con RBAC. Mientras tanto, el guard global de EP-07 no
- * debe exigir JWT en el proof E2E de D3.
+ * Endpoints de tickets (EP-03). Requieren JWT (el guard global de EP-07 aplica;
+ * este controller ya NO es @Public). La cola/filtros llegan en EP-05 y las
+ * transiciones de estado en EP-04.
  */
-@Public()
 @Controller('tickets')
 export class TicketsController {
   constructor(private readonly tickets: TicketsService) {}
 
-  // GET /v1/tickets — reads from the database (not a hardcoded payload).
-  @Get()
-  list() {
-    return this.tickets.list();
+  // POST /v1/tickets — crea un ticket. 201 + Location; 200 si Idempotency-Key repetido.
+  @Post()
+  async create(
+    @Body() dto: CreateTicketDto,
+    @CurrentUser() user: User,
+    @Res({ passthrough: true }) res: Response,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    const { ticket, created } = await this.tickets.create(dto, user, idempotencyKey);
+    res.status(created ? 201 : 200);
+    res.setHeader('Location', `/v1/tickets/${ticket.ticketNumber}`);
+    return ticket;
   }
 
-  // POST /v1/tickets — writes the JSON body to S3, returns 201 + object key.
-  @Post()
-  @HttpCode(201)
-  create(@Body() body: Record<string, unknown>): Promise<StoredObject> {
-    return this.tickets.saveAttachment(body);
+  // GET /v1/tickets/:id — un ticket (ownership: reportante solo los suyos → 404).
+  @Get(':id')
+  getOne(@Param('id', new ParseUUIDPipe()) id: string, @CurrentUser() user: User) {
+    return this.tickets.getForUser(id, user);
   }
 }
