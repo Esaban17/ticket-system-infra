@@ -1,10 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, Ticket, User, EventType } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import { Prisma, Role, Ticket, TicketStatus, User, EventType } from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
+import { UsersService } from '@/users/users.service';
 import { requireOwnTicket } from '@/auth/ownership';
 import { CreateTicketDto } from './dto/create-ticket.dto';
+import { AssignTicketDto } from './dto/assign-ticket.dto';
+import { ChangeStateDto } from './dto/change-state.dto';
 import { calculatePriority } from './priority';
+import { canTransition } from './state-machine';
 
 const IDEMPOTENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -15,7 +26,10 @@ export interface CreateResult {
 
 @Injectable()
 export class TicketsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly users: UsersService,
+  ) {}
 
   /**
    * Crea un ticket (BL-014): valida (DTO), calcula prioridad, lee el SLA por
@@ -38,9 +52,7 @@ export class TicketsService {
 
     const priority = calculatePriority(dto.severity, dto.impact);
     const sla = await this.prisma.slaRule.findUnique({ where: { priority } });
-    const slaDueAt = sla
-      ? new Date(Date.now() + sla.timeToResolveMinutes * 60_000)
-      : null;
+    const slaDueAt = sla ? new Date(Date.now() + sla.timeToResolveMinutes * 60_000) : null;
 
     try {
       const ticket = await this.prisma.$transaction(async (tx) => {
@@ -98,5 +110,119 @@ export class TicketsService {
     }
     requireOwnTicket(ticket, user);
     return ticket;
+  }
+
+  /**
+   * Asigna el ticket a un agente/admin (BL-018) con optimistic locking.
+   * UPDATE ... WHERE id=? AND version=? ; 0 filas → 409 conflict-version.
+   */
+  async assign(id: string, dto: AssignTicketDto, actor: User): Promise<Ticket> {
+    const ticket = await this.prisma.ticket.findUnique({ where: { id } });
+    if (!ticket) {
+      throw new NotFoundException('Ticket no encontrado');
+    }
+
+    const assignee = await this.users.findById(dto.assigneeId);
+    if (!assignee || assignee.role === Role.reportante) {
+      throw new UnprocessableEntityException('El assignee debe ser un agente o administrador');
+    }
+
+    const { count } = await this.prisma.ticket.updateMany({
+      where: { id, version: dto.expectedVersion },
+      data: { assigneeId: dto.assigneeId, version: { increment: 1 } },
+    });
+    if (count === 0) {
+      throw new ConflictException({
+        type: 'conflict-version',
+        detail: 'El ticket cambió; refetch y reintenta',
+      });
+    }
+
+    await this.prisma.ticketEvent.create({
+      data: {
+        ticketId: id,
+        actorId: actor.id,
+        eventType: EventType.asignacion,
+        payload: { from_assignee_id: ticket.assigneeId, to_assignee_id: dto.assigneeId },
+      },
+    });
+    return this.prisma.ticket.findUniqueOrThrow({ where: { id } });
+  }
+
+  /**
+   * Transición de estado con máquina de estados pura + optimistic locking (BL-019/020).
+   * Para 'resuelto' exige root_cause + solution (400 antes de tocar BD) y setea resolved_at.
+   */
+  async changeState(id: string, dto: ChangeStateDto, actor: User): Promise<Ticket> {
+    const ticket = await this.prisma.ticket.findUnique({ where: { id } });
+    if (!ticket) {
+      throw new NotFoundException('Ticket no encontrado');
+    }
+
+    const next = dto.targetState as TicketStatus;
+
+    if (next === TicketStatus.resuelto && (!dto.rootCause || !dto.solution)) {
+      throw new BadRequestException('Resolver requiere root_cause y solution');
+    }
+
+    // Solo el assignee o un administrador pueden mover el ticket.
+    const isAdmin = actor.role === Role.administrador;
+    if (!isAdmin && ticket.assigneeId !== actor.id) {
+      throw new ForbiddenException(
+        'Solo el agente asignado o un administrador pueden cambiar el estado',
+      );
+    }
+
+    if (next === TicketStatus.en_progreso && !ticket.assigneeId) {
+      throw new UnprocessableEntityException({
+        type: 'assignee-required',
+        detail: 'El ticket no tiene assignee',
+      });
+    }
+
+    const transition = canTransition(ticket.status, next, actor.role);
+    if (!transition.ok) {
+      throw new UnprocessableEntityException({
+        type: 'invalid-transition',
+        detail: transition.reason,
+      });
+    }
+
+    const data: Prisma.TicketUpdateManyMutationInput = { status: next, version: { increment: 1 } };
+    if (next === TicketStatus.resuelto) {
+      data.resolvedAt = new Date();
+      data.rootCause = dto.rootCause;
+      data.solution = dto.solution;
+    }
+
+    const { count } = await this.prisma.ticket.updateMany({
+      where: { id, version: dto.expectedVersion, status: ticket.status },
+      data,
+    });
+    if (count === 0) {
+      throw new ConflictException({
+        type: 'conflict-version',
+        detail: 'El ticket cambió; refetch y reintenta',
+      });
+    }
+
+    await this.prisma.ticketEvent.create({
+      data: {
+        ticketId: id,
+        actorId: actor.id,
+        eventType: next === TicketStatus.resuelto ? EventType.resolucion : EventType.cambio_estado,
+        payload:
+          next === TicketStatus.resuelto
+            ? {
+                from_state: ticket.status,
+                to_state: next,
+                root_cause: dto.rootCause,
+                solution: dto.solution,
+                resolved_by: actor.id,
+              }
+            : { from_state: ticket.status, to_state: next },
+      },
+    });
+    return this.prisma.ticket.findUniqueOrThrow({ where: { id } });
   }
 }

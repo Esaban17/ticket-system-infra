@@ -6,7 +6,13 @@ import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 
 const user = { id: 'u1', role: Role.reportante } as User;
-const dto = { type: 'incidente', title: 'x'.repeat(6), description: 'y'.repeat(25), severity: 2, impact: 2 } as CreateTicketDto;
+const dto = {
+  type: 'incidente',
+  title: 'x'.repeat(6),
+  description: 'y'.repeat(25),
+  severity: 2,
+  impact: 2,
+} as CreateTicketDto;
 
 function res() {
   const r = { status: jest.fn(), setHeader: jest.fn() };
