@@ -1,5 +1,6 @@
 import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
 
+import { Public } from '@/common/decorators/public.decorator';
 import { PrismaService } from '@/prisma/prisma.service';
 
 const READINESS_DB_TIMEOUT_MS = 2000;
@@ -19,11 +20,13 @@ const READINESS_DB_TIMEOUT_MS = 2000;
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
+  @Public()
   @Get('healthz')
   liveness(): { status: string } {
     return { status: 'ok' };
   }
 
+  @Public()
   @Get('readyz')
   async readiness(): Promise<{ status: string }> {
     try {
