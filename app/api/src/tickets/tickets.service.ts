@@ -1,53 +1,102 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, Ticket, User, EventType } from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
+import { requireOwnTicket } from '@/auth/ownership';
+import { CreateTicketDto } from './dto/create-ticket.dto';
+import { calculatePriority } from './priority';
 
-export interface StoredObject {
-  key: string;
-  bucket: string;
+const IDEMPOTENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export interface CreateResult {
+  ticket: Ticket;
+  created: boolean; // false cuando se resolvió por Idempotency-Key existente
 }
 
-/**
- * Business logic for the two end-to-end proof endpoints (Delivery 3):
- *   - list()           reads ticket rows from RDS via Prisma (DB path).
- *   - saveAttachment() writes a JSON object to the S3 bucket (storage path).
- *
- * AWS credentials are NOT configured here: the pod assumes its IRSA role and
- * the AWS SDK picks up the temporary credentials automatically from the
- * environment injected by EKS Pod Identity / IRSA.
- */
 @Injectable()
 export class TicketsService {
-  private readonly logger = new Logger(TicketsService.name);
-  private readonly s3: S3Client;
-  private readonly bucket: string;
+  constructor(private readonly prisma: PrismaService) {}
 
-  constructor(private readonly prisma: PrismaService) {
-    this.bucket = process.env.AWS_S3_BUCKET_ATTACHMENTS ?? '';
-    this.s3 = new S3Client({ region: process.env.AWS_REGION });
+  /**
+   * Crea un ticket (BL-014): valida (DTO), calcula prioridad, lee el SLA por
+   * prioridad, calcula sla_due_at, persiste ticket + evento `ticket_creado` en
+   * una transacción. Si llega `idempotencyKey`, no duplica dentro de 24h.
+   * El reportante siempre se crea como su propio `reporter_id`.
+   */
+  async create(dto: CreateTicketDto, user: User, idempotencyKey?: string): Promise<CreateResult> {
+    if (idempotencyKey) {
+      const existing = await this.prisma.ticket.findFirst({
+        where: {
+          idempotencyKey,
+          createdAt: { gt: new Date(Date.now() - IDEMPOTENCY_WINDOW_MS) },
+        },
+      });
+      if (existing) {
+        return { ticket: existing, created: false };
+      }
+    }
+
+    const priority = calculatePriority(dto.severity, dto.impact);
+    const sla = await this.prisma.slaRule.findUnique({ where: { priority } });
+    const slaDueAt = sla
+      ? new Date(Date.now() + sla.timeToResolveMinutes * 60_000)
+      : null;
+
+    try {
+      const ticket = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.ticket.create({
+          data: {
+            type: dto.type,
+            title: dto.title,
+            description: dto.description,
+            severity: dto.severity,
+            impact: dto.impact,
+            priority,
+            reporterId: user.id,
+            slaDueAt,
+            idempotencyKey: idempotencyKey ?? null,
+          },
+        });
+        await tx.ticketEvent.create({
+          data: {
+            ticketId: created.id,
+            actorId: user.id,
+            eventType: EventType.ticket_creado,
+            payload: {
+              ticket_number: created.ticketNumber,
+              type: created.type,
+              priority: created.priority,
+              severity: created.severity,
+              impact: created.impact,
+            },
+          },
+        });
+        return created;
+      });
+      return { ticket, created: true };
+    } catch (err) {
+      // Carrera con el mismo Idempotency-Key: el unique lo atrapa → devolver el existente.
+      if (
+        idempotencyKey &&
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const existing = await this.prisma.ticket.findFirst({ where: { idempotencyKey } });
+        if (existing) {
+          return { ticket: existing, created: false };
+        }
+      }
+      throw err;
+    }
   }
 
-  /** GET /v1/tickets — returns DB-sourced rows as JSON. */
-  list() {
-    return this.prisma.ticket.findMany({ orderBy: { id: 'asc' } });
-  }
-
-  /** POST /v1/tickets — writes the request body to S3, returns the object key. */
-  async saveAttachment(payload: unknown): Promise<StoredObject> {
-    const key = `uploads/${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID()}.json`;
-
-    await this.s3.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-        Body: JSON.stringify(payload ?? {}),
-        ContentType: 'application/json',
-      }),
-    );
-
-    this.logger.log(`Stored object s3://${this.bucket}/${key}`);
-    return { key, bucket: this.bucket };
+  /** Obtiene un ticket aplicando ownership (reportante solo los propios → 404). */
+  async getForUser(id: string, user: User): Promise<Ticket> {
+    const ticket = await this.prisma.ticket.findUnique({ where: { id } });
+    if (!ticket) {
+      throw new NotFoundException('Ticket no encontrado');
+    }
+    requireOwnTicket(ticket, user);
+    return ticket;
   }
 }
