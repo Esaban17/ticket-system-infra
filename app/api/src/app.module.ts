@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
 import { configuration } from '@/config/configuration';
 import { validate } from '@/config/env.validation';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { LoggingInterceptor } from '@/common/interceptors/logging.interceptor';
+import { JwtAuthGuard } from '@/auth/jwt-auth.guard';
+import { RolesGuard } from '@/auth/roles.guard';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { UsersModule } from '@/users/users.module';
 import { TicketsModule } from '@/tickets/tickets.module';
@@ -53,6 +55,17 @@ import { HealthController } from '@/health/health.controller';
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
+    },
+    // RBAC global (EP-07): autentica (mock JWT) y luego valida rol. Los
+    // endpoints @Public() (healthz/readyz) se omiten. El orden importa:
+    // JwtAuthGuard puebla request.user antes de que RolesGuard lo evalúe.
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
     },
   ],
 })
