@@ -1,31 +1,51 @@
 // ============================================================
-// Seed — Delivery 3 E2E proof
+// Seed — datos base del dominio (EP-02)
 // ============================================================
-// Committed, reproducible seed mechanism (rubric: no console-inserted data).
-// Run in-cluster by the db-seed Job (`node dist/seed.js`) AFTER
-// `prisma migrate deploy`, so the tickets table exists and has >=1 row before
-// the GET /v1/tickets endpoint is invoked.
+// Idempotente. Crea los 3 roles de usuario y un ticket de ejemplo. Las
+// sla_rules se cargan por la migración 0002_sla_seeds (no aquí).
+// Se ejecuta in-cluster por el Job de seed (`node dist/seed.js`) después de
+// `prisma migrate deploy`.
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Role, TicketType, Priority } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
-  const existing = await prisma.ticket.count();
+  const reporter = await prisma.user.upsert({
+    where: { email: 'reportante@ticket-system.dev' },
+    update: {},
+    create: { email: 'reportante@ticket-system.dev', role: Role.reportante },
+  });
+  await prisma.user.upsert({
+    where: { email: 'agente@ticket-system.dev' },
+    update: {},
+    create: { email: 'agente@ticket-system.dev', role: Role.agente },
+  });
+  await prisma.user.upsert({
+    where: { email: 'admin@ticket-system.dev' },
+    update: {},
+    create: { email: 'admin@ticket-system.dev', role: Role.administrador },
+  });
 
-  if (existing === 0) {
+  const ticketCount = await prisma.ticket.count();
+  if (ticketCount === 0) {
     await prisma.ticket.create({
       data: {
-        title: 'Seed ticket — Delivery 3 end-to-end connectivity proof',
-        status: 'open',
-        priority: 'high',
+        type: TicketType.incidente,
+        title: 'Seed ticket — prueba de conectividad E2E',
+        description:
+          'Ticket sembrado para validar el camino externo → ingress → API → RDS en Delivery 3/4.',
+        severity: 2,
+        impact: 2,
+        priority: Priority.alta,
+        reporterId: reporter.id,
       },
     });
     // eslint-disable-next-line no-console
-    console.log('Seed inserted: 1 ticket.');
+    console.log('Seed: 3 usuarios + 1 ticket creados.');
   } else {
     // eslint-disable-next-line no-console
-    console.log(`Seed skipped: ${existing} ticket(s) already present.`);
+    console.log(`Seed: usuarios asegurados; ${ticketCount} ticket(s) ya existen.`);
   }
 }
 

@@ -7,6 +7,7 @@ import { validate } from '@/config/env.validation';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { LoggingInterceptor } from '@/common/interceptors/logging.interceptor';
 import { PrismaModule } from '@/prisma/prisma.module';
+import { UsersModule } from '@/users/users.module';
 import { TicketsModule } from '@/tickets/tickets.module';
 import { HealthController } from '@/health/health.controller';
 
@@ -33,8 +34,9 @@ import { HealthController } from '@/health/health.controller';
       cache: true,
     }),
 
-    // Delivery 3: persistence + the end-to-end proof resource.
+    // Persistencia + dominio.
     PrismaModule,
+    UsersModule,
     TicketsModule,
   ],
   controllers: [
