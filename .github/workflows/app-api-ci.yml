@@ -101,3 +101,7 @@ jobs:
       # Verifica que el seed corre sobre el esquema migrado.
       - name: Run seed
         run: node dist/seed.js
+
+      # Tests de integración contra Postgres real (optimistic locking, BL-021).
+      - name: Integration tests
+        run: npm run test:int
