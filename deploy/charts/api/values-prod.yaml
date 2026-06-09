@@ -1,0 +1,53 @@
+# =============================================================================
+# Overrides para el entorno de producción (prod).
+# Uso: helm upgrade --install api ./deploy/charts/api -f values-prod.yaml
+# =============================================================================
+
+# 2 réplicas base en prod (el HPA escala entre min y max).
+replicaCount: 2
+
+image:
+  # Tags inmutables en prod: nunca usar :latest.
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"
+
+serviceAccount:
+  create: true
+  name: api-sa
+  # ARN real del rol IRSA de la API (terraform output del módulo BL-104).
+  roleArn: ""
+
+config:
+  configMapName: ticket-system-config
+  secretName: ticket-system-secrets
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+# Garantizar al menos 1 pod durante drains/upgrades de nodos.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Repartir réplicas entre nodos/AZ para tolerar la caída de un nodo.
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: ticket-system-api
+              app.kubernetes.io/component: api
