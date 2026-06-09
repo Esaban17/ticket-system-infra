@@ -13,8 +13,8 @@ function buildMockHost(overrides?: {
   const jsonFn = overrides?.jsonFn ?? jest.fn();
   const statusFn = overrides?.statusFn ?? jest.fn().mockReturnValue({ json: jsonFn });
 
-  const mockRequest = { method, url };
-  const mockResponse = { status: statusFn };
+  const mockRequest = { method, url, headers: {} as Record<string, string> };
+  const mockResponse = { status: statusFn, setHeader: jest.fn() };
 
   return {
     switchToHttp: jest.fn().mockReturnValue({
@@ -50,13 +50,14 @@ describe('HttpExceptionFilter', () => {
       expect(statusFn).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
       const body = jsonFn.mock.calls[0][0];
       expect(body).toMatchObject({
-        type: `https://httpstatuses.com/${HttpStatus.NOT_FOUND}`,
+        type: 'not-found',
         title: 'Recurso no encontrado',
         status: HttpStatus.NOT_FOUND,
         detail: 'Recurso no encontrado',
         instance: '/v1/tickets/99',
       });
       expect(typeof body.timestamp).toBe('string');
+      expect(typeof body.request_id).toBe('string');
     });
 
     it('timestamp es un ISO 8601 válido', () => {
@@ -159,15 +160,43 @@ describe('HttpExceptionFilter', () => {
     });
   });
 
-  describe('type URL usa el status code', () => {
-    it('construye type con https://httpstatuses.com/<status>', () => {
+  describe('type es un slug de problema por status (RFC 9457)', () => {
+    it('CONFLICT → "conflict"', () => {
       const exception = new HttpException('Conflict', HttpStatus.CONFLICT);
       const { switchToHttp, jsonFn } = buildMockHost();
 
       filter.catch(exception, { switchToHttp } as any);
 
       const body = jsonFn.mock.calls[0][0];
-      expect(body.type).toBe(`https://httpstatuses.com/${HttpStatus.CONFLICT}`);
+      expect(body.type).toBe('conflict');
+    });
+
+    it('respeta el type provisto en el cuerpo de la excepción', () => {
+      const exception = new HttpException(
+        { type: 'conflict-version', detail: 'cambió' },
+        HttpStatus.CONFLICT,
+      );
+      const { switchToHttp, jsonFn } = buildMockHost();
+
+      filter.catch(exception, { switchToHttp } as any);
+
+      const body = jsonFn.mock.calls[0][0];
+      expect(body.type).toBe('conflict-version');
+      expect(body.detail).toBe('cambió');
+    });
+
+    it('usa el x-request-id del header si viene', () => {
+      const exception = new HttpException('x', HttpStatus.BAD_REQUEST);
+      const { switchToHttp, jsonFn } = buildMockHost();
+      // inyecta el header en el request mock
+      const host = { switchToHttp } as any;
+      const req = host.switchToHttp().getRequest();
+      req.headers['x-request-id'] = 'req-abc';
+
+      filter.catch(exception, host);
+
+      const body = jsonFn.mock.calls[0][0];
+      expect(body.request_id).toBe('req-abc');
     });
   });
 
