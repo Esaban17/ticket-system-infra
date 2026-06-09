@@ -1,0 +1,25 @@
+apiVersion: v2
+name: ticket-system-api
+description: >-
+  Chart base para desplegar la API (NestJS + Prisma) del ticket-system en EKS.
+  Incluye Deployment, Service ClusterIP, ServiceAccount con IRSA, HPA y PDB.
+  Alternativa/compañera al despliegue kubernetes_* gestionado por Terraform.
+type: application
+
+# Versión del chart (SemVer). Subir en cada cambio del empaquetado.
+version: 0.1.0
+
+# Versión de la aplicación contenida. Coincide con el tag de imagen en ECR.
+appVersion: "1.0.0"
+
+# Probado contra el schema de Kubernetes 1.30 (apps/v1, autoscaling/v2,
+# policy/v1 — todas GA en 1.30).
+kubeVersion: ">=1.27.0-0"
+
+maintainers:
+  - name: Estuardo
+keywords:
+  - ticket-system
+  - api
+  - nestjs
+  - eks
