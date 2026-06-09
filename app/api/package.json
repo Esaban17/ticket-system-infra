@@ -88,6 +88,7 @@
       "main.ts",
       "seed.ts",
       "int-spec.ts",
+      ".handler.ts",
       "prisma/prisma.service.ts",
       "prisma/prisma.module.ts"
     ],
