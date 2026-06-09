@@ -14,10 +14,17 @@ import { requireOwnTicket } from '@/auth/ownership';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { ChangeStateDto } from './dto/change-state.dto';
+import { ListTicketsQuery, ListEventsQuery } from './dto/list-tickets.query';
 import { calculatePriority } from './priority';
 import { canTransition } from './state-machine';
 
 const IDEMPOTENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_LIMIT = 20;
+
+export interface Page<T> {
+  items: T[];
+  nextCursor: string | null;
+}
 
 export interface CreateResult {
   ticket: Ticket;
@@ -100,6 +107,64 @@ export class TicketsService {
       }
       throw err;
     }
+  }
+
+  /**
+   * Cola de tickets con filtros + búsqueda + paginación cursor (BL-023).
+   * Reportante: filtro implícito reporter_id = self, sin override.
+   * assignee_id='me' resuelve al usuario del JWT.
+   */
+  async list(query: ListTicketsQuery, user: User): Promise<Page<Ticket>> {
+    const where: Prisma.TicketWhereInput = {};
+
+    if (user.role === Role.reportante) {
+      where.reporterId = user.id; // sin opción de override
+    }
+    if (query.status) where.status = query.status as TicketStatus;
+    if (query.priority) where.priority = query.priority as Prisma.TicketWhereInput['priority'];
+    if (query.severity) where.severity = query.severity;
+    if (query.assigneeId) {
+      where.assigneeId = query.assigneeId === 'me' ? user.id : query.assigneeId;
+    }
+    if (query.createdFrom || query.createdTo) {
+      where.createdAt = {
+        ...(query.createdFrom ? { gte: new Date(query.createdFrom) } : {}),
+        ...(query.createdTo ? { lte: new Date(query.createdTo) } : {}),
+      };
+    }
+    if (query.q) {
+      where.OR = [
+        { title: { contains: query.q, mode: 'insensitive' } },
+        { description: { contains: query.q, mode: 'insensitive' } },
+      ];
+    }
+
+    const limit = query.limit ?? DEFAULT_LIMIT;
+    const items = await this.prisma.ticket.findMany({
+      where,
+      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+    });
+    return { items, nextCursor: items.length === limit ? items[items.length - 1].id : null };
+  }
+
+  /** Historial inmutable de un ticket con paginación cursor (BL-022). */
+  async events(ticketId: string, query: ListEventsQuery, user: User): Promise<Page<unknown>> {
+    await this.getForUser(ticketId, user); // valida existencia + ownership (404)
+
+    const limit = query.limit ?? DEFAULT_LIMIT;
+    const items = await this.prisma.ticketEvent.findMany({
+      where: { ticketId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      include: { actor: { select: { id: true, email: true, role: true } } },
+    });
+    return {
+      items,
+      nextCursor: items.length === limit ? items[items.length - 1].id : null,
+    };
   }
 
   /** Obtiene un ticket aplicando ownership (reportante solo los propios → 404). */
