@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Res,
 } from '@nestjs/common';
 import { Response } from 'express';
@@ -18,6 +19,7 @@ import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { ChangeStateDto } from './dto/change-state.dto';
+import { ListTicketsQuery, ListEventsQuery } from './dto/list-tickets.query';
 
 /**
  * Endpoints de tickets (EP-03). Requieren JWT (el guard global de EP-07 aplica;
@@ -40,6 +42,22 @@ export class TicketsController {
     res.status(created ? 201 : 200);
     res.setHeader('Location', `/v1/tickets/${ticket.ticketNumber}`);
     return ticket;
+  }
+
+  // GET /v1/tickets — cola con filtros + búsqueda + paginación cursor (BL-023).
+  @Get()
+  list(@Query() query: ListTicketsQuery, @CurrentUser() user: User) {
+    return this.tickets.list(query, user);
+  }
+
+  // GET /v1/tickets/:id/events — historial inmutable, cursor (BL-022).
+  @Get(':id/events')
+  events(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Query() query: ListEventsQuery,
+    @CurrentUser() user: User,
+  ) {
+    return this.tickets.events(id, query, user);
   }
 
   // GET /v1/tickets/:id — un ticket (ownership: reportante solo los suyos → 404).
