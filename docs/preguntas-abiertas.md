@@ -182,6 +182,35 @@ nuevo**. RFC completo en `docs/rfcs/Q8-concurrencia.md`.
 2. Unifica el patrón con el worker de escalamiento (que ya detecta conflictos por
    filas afectadas = 0) y hace la concurrencia explícita y testeable (BL-021).
 
+## Q7 — Cerrada — RDS sizing y disponibilidad (AZ)
+
+**Estado:** CERRADA — 2026-06-09
+**Owner:** Estuardo (BL-139)
+**ADR:** `docs/adrs/0007-rds-availability.md`
+
+### Decisión
+
+**Single-AZ en dev** (`db.t4g.micro`, `db_multi_az = false`, ~12 USD/mes) por
+costo; **Multi-AZ recomendado en prod** (`db_multi_az = true`) por alta
+disponibilidad y failover automático (RPO ~0, RTO ~60-120 s).
+
+### Rationale
+
+Resumido aquí; detalle completo en `docs/adrs/0007-rds-availability.md` y
+`docs/trade-offs/03-database.md`.
+
+1. Dev acumula costo todo el ciclo y no tiene SLA: Single-AZ minimiza gasto.
+2. Prod requiere tolerar la caída de una AZ completa: el standby síncrono de
+   Multi-AZ promueve automáticamente sin pérdida de transacciones confirmadas.
+3. El subnet group ya abarca ≥2 AZs, así que pasar a Multi-AZ es un solo cambio
+   de valor de variable, sin tocar el código del módulo.
+
+### Implementación
+
+`infra/modules/database/variables.tf:55-59` (variable `multi_az`),
+`infra/modules/database/main.tf:67` (`multi_az = var.multi_az`),
+`infra/envs/dev/dev.tfvars:12` (`db_multi_az = false`) y
+`infra/envs/prod/prod.tfvars` (`db_multi_az = true`).
 ## Q9 — Cerrada
 
 **Estado:** CERRADA — 2026-06-09
