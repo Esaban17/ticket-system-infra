@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 
@@ -6,6 +6,8 @@ import { configuration } from '@/config/configuration';
 import { validate } from '@/config/env.validation';
 import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { LoggingInterceptor } from '@/common/interceptors/logging.interceptor';
+import { ObservabilityModule } from '@/common/observability.module';
+import { RequestIdMiddleware } from '@/common/middleware/request-id.middleware';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { TicketsModule } from '@/tickets/tickets.module';
 import { HealthController } from '@/health/health.controller';
@@ -33,6 +35,9 @@ import { HealthController } from '@/health/health.controller';
       cache: true,
     }),
 
+    // Observabilidad (EP-18): logger JSON + métricas EMF, globales.
+    ObservabilityModule,
+
     // Delivery 3: persistence + the end-to-end proof resource.
     PrismaModule,
     TicketsModule,
@@ -54,4 +59,9 @@ import { HealthController } from '@/health/health.controller';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  // EP-18: propaga request_id en todas las rutas antes de los handlers.
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+}
