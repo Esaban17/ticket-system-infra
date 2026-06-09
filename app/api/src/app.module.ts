@@ -14,6 +14,7 @@ import { PrismaModule } from '@/prisma/prisma.module';
 import { UsersModule } from '@/users/users.module';
 import { TicketsModule } from '@/tickets/tickets.module';
 import { AttachmentsModule } from '@/attachments/attachments.module';
+import { ReportsModule } from '@/reports/reports.module';
 import { HealthController } from '@/health/health.controller';
 
 /**
@@ -47,6 +48,7 @@ import { HealthController } from '@/health/health.controller';
     UsersModule,
     TicketsModule,
     AttachmentsModule,
+    ReportsModule,
   ],
   controllers: [
     // Liveness/readiness probes for the ALB target group (outside /v1 prefix).

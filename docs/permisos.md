@@ -20,7 +20,7 @@ Roles: **reportante**, **agente**, **administrador**.
 | `PATCH /v1/tickets/{id}/state` (resolver) | ❌ 403 | ✅ (assignee) | ✅ | exige `root_cause` + `solution` |
 | `POST /v1/attachments` | ✅ | ✅ | ✅ | upload presignado, dueño = uploader |
 | `GET /v1/attachments/{id}/download` | ✅ (de sus tickets) | ✅ | ✅ | 404 si adjunto ajeno |
-| `GET /v1/reports/resolved.csv` | ❌ 403 | ✅ | ✅ | reporte de resueltos |
+| `GET /v1/reports/tickets.csv` | ❌ 403 | ❌ 403 | ✅ | export CSV de resueltos (solo admin, BL-037) |
 
 **Reglas transversales**
 - Sin header `Authorization: Bearer` → **401** (excepto endpoints `@Public`).
