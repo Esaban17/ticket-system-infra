@@ -79,6 +79,7 @@
       "/node_modules/",
       "main.ts",
       "seed.ts",
+      ".handler.ts",
       "prisma/prisma.service.ts",
       "prisma/prisma.module.ts"
     ],
