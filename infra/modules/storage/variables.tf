@@ -42,9 +42,12 @@ variable "transition_to_glacier_days" {
   type        = number
   default     = 90
 
+  # La relación con transition_to_ia_days (glacier > IA) se valida con un
+  # precondition en main.tf: las validaciones de variable solo pueden referirse
+  # a sí mismas en Terraform < 1.9 (el CI fija ~> 1.8).
   validation {
-    condition     = var.transition_to_glacier_days <= 0 || var.transition_to_glacier_days > var.transition_to_ia_days
-    error_message = "transition_to_glacier_days must be greater than transition_to_ia_days (or <= 0 to disable Glacier transition)."
+    condition     = floor(var.transition_to_glacier_days) == var.transition_to_glacier_days
+    error_message = "transition_to_glacier_days must be an integer number of days (use 0 or a negative value to disable the Glacier transition)."
   }
 }
 
@@ -53,8 +56,10 @@ variable "expire_current_days" {
   type        = number
   default     = 0
 
+  # La relación con transition_to_glacier_days (expire > glacier) se valida con
+  # un precondition en main.tf (ver nota arriba sobre TF < 1.9).
   validation {
-    condition     = var.expire_current_days <= 0 || var.transition_to_glacier_days <= 0 || var.expire_current_days > var.transition_to_glacier_days
-    error_message = "expire_current_days must be greater than transition_to_glacier_days when both are enabled (or <= 0 to disable current-version expiration)."
+    condition     = floor(var.expire_current_days) == var.expire_current_days
+    error_message = "expire_current_days must be an integer number of days (use 0 or a negative value to disable current-version expiration)."
   }
 }

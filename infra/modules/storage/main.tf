@@ -68,6 +68,20 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
   # Depends on versioning so the noncurrent rule is meaningful.
   depends_on = [aws_s3_bucket_versioning.this]
 
+  # El orden entre tiers (IA → Glacier → expiración) requiere referencias entre
+  # variables, no permitidas en validaciones de variable bajo TF < 1.9; se
+  # expresa aquí como preconditions (sí soportan referencias cruzadas).
+  lifecycle {
+    precondition {
+      condition     = var.transition_to_glacier_days <= 0 || var.transition_to_glacier_days > var.transition_to_ia_days
+      error_message = "transition_to_glacier_days debe ser mayor que transition_to_ia_days (o <= 0 para deshabilitar Glacier)."
+    }
+    precondition {
+      condition     = var.expire_current_days <= 0 || var.transition_to_glacier_days <= 0 || var.expire_current_days > var.transition_to_glacier_days
+      error_message = "expire_current_days debe ser mayor que transition_to_glacier_days cuando ambos están habilitados (o <= 0 para deshabilitarlo)."
+    }
+  }
+
   rule {
     id     = "transition-attachments-tiered-and-expire"
     status = "Enabled"
