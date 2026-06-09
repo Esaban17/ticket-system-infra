@@ -36,3 +36,25 @@ variable "expire_noncurrent_versions_days" {
   type        = number
   default     = 90
 }
+
+variable "transition_to_glacier_days" {
+  description = "Number of days after which current versions of objects under lifecycle_prefix transition from STANDARD_IA to GLACIER (cheap, archival storage for cold attachments/reports). MUST be greater than transition_to_ia_days. Set to 0 (or any non-positive value) to disable the Glacier transition entirely. Default of 90 keeps objects in IA for ~2 months before archiving."
+  type        = number
+  default     = 90
+
+  validation {
+    condition     = var.transition_to_glacier_days <= 0 || var.transition_to_glacier_days > var.transition_to_ia_days
+    error_message = "transition_to_glacier_days must be greater than transition_to_ia_days (or <= 0 to disable Glacier transition)."
+  }
+}
+
+variable "expire_current_days" {
+  description = "Number of days after which CURRENT versions of objects under lifecycle_prefix are expired (a delete marker is added). MUST be greater than transition_to_glacier_days when Glacier is enabled. Set to 0 (or any non-positive value) to disable expiration of current objects (default), so attachments/reports are retained indefinitely unless overridden per environment."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.expire_current_days <= 0 || var.transition_to_glacier_days <= 0 || var.expire_current_days > var.transition_to_glacier_days
+    error_message = "expire_current_days must be greater than transition_to_glacier_days when both are enabled (or <= 0 to disable current-version expiration)."
+  }
+}
