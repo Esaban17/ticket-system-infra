@@ -160,3 +160,26 @@ ACM y redirect HTTP→HTTPS. Items BL-111, BL-112, BL-113 en
 `docs/backlog.md` épica EP-09, scoped para D4.
 
 ---
+
+## Q8 — Concurrencia en mutaciones de tickets: ¿optimista o pesimista?
+
+**Estado:** CERRADA — 2026-06-09
+**Owner:** Estuardo (BL-016)
+
+### Decisión
+
+Se adopta **optimistic locking con la columna `version`** para todas las
+mutaciones de `tickets` (asignación, cambio de estado, resolución y
+escalamiento). El `UPDATE` lleva `WHERE id=? AND version=:expected_version`
+e incrementa `version`; si afecta 0 filas se devuelve **409** (Problem Details
+`conflict-version`) y el cliente hace **refetch + reintento con el `version`
+nuevo**. RFC completo en `docs/rfcs/Q8-concurrencia.md`.
+
+### Rationale
+
+1. Mejor throughput sin locks de fila retenidos y deadlock nulo; las colisiones
+   reales (dos agentes tomando el mismo ticket) son raras a la escala del sistema.
+2. Unifica el patrón con el worker de escalamiento (que ya detecta conflictos por
+   filas afectadas = 0) y hace la concurrencia explícita y testeable (BL-021).
+
+---
