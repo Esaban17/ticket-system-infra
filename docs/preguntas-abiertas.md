@@ -160,3 +160,41 @@ ACM y redirect HTTP→HTTPS. Items BL-111, BL-112, BL-113 en
 `docs/backlog.md` épica EP-09, scoped para D4.
 
 ---
+
+## Q9 — Cerrada
+
+**Estado:** CERRADA — 2026-06-09
+**Owner:** Estuardo (BL-130 infra · BL-040 lado API)
+**ADR:** `docs/adrs/0009-auth-worker-api.md`
+
+### Decisión
+
+La identidad del worker hacia la API se prueba con un **service JWT asimétrico
+(RS256)**. El worker (Lambda) firma un JWT corto con una **clave privada RSA-2048**
+que lee de Secrets Manager (`ticket-system/${env}/worker-jwt-private`); la API lo
+verifica con la **clave pública** (`ticket-system/${env}/worker-jwt-public`) en un
+guard dedicado (`ServiceTokenGuard`) montado sobre `/internal/v1/*`.
+
+Se eligió sobre **IAM SigV4** porque el borde del sistema es **ALB Ingress, no
+API Gateway** (Q-NET-4): SigV4 no es nativo en ALB+EKS y exigiría anteponer API
+Gateway o un verificador casero. Se descartó que el worker escribiera directo en
+RDS porque rompe la política de "API como única puerta de escritura" y salta la
+lógica de dominio (estados, RBAC, optimistic locking de Q8).
+
+### Rationale (resumen)
+
+1. **Coherente con la topología ya mergeada** — el token entra por el ALB como
+   `Authorization: Bearer`, sin componentes nuevos.
+2. **Asimetría / mínimo privilegio** — la API solo lee la clave pública y no puede
+   falsificar tokens; el worker solo lee la privada (separación por IAM en BL-131).
+3. **Verificación idiomática y testeable** — guard de NestJS que valida firma
+   RS256 + `iss=ticket-system-worker` + `aud=ticket-system-api` + `exp` ≤ 5 min.
+
+### Trade-off aceptado
+
+**Rotación manual cada 90 días** (SigV4 la daría gratis con STS), mitigada con
+runbook (`docs/runbooks/rotar-worker-jwt.md`, BL-131) y aceptación de dos claves
+públicas durante la ventana de rotación. Detalle, claims y pseudo-código del
+verificador en `docs/adrs/0009-auth-worker-api.md`.
+
+---
