@@ -49,3 +49,55 @@ jobs:
           path: app/api/coverage
           if-no-files-found: ignore
           retention-days: 14
+
+  migrations:
+    name: Migrations (ephemeral Postgres)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: app/api
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ticket_admin
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: tickets
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ticket_admin -d tickets"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://ticket_admin:ci_only_password@localhost:5432/tickets?schema=public
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: app/api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      # Aplica TODAS las migraciones de cero contra el Postgres efímero (BL-011).
+      - name: Apply migrations from scratch
+        run: npx prisma migrate deploy
+
+      - name: Build
+        run: npm run build
+
+      # Verifica que el seed corre sobre el esquema migrado.
+      - name: Run seed
+        run: node dist/seed.js

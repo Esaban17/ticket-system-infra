@@ -160,3 +160,91 @@ ACM y redirect HTTP→HTTPS. Items BL-111, BL-112, BL-113 en
 `docs/backlog.md` épica EP-09, scoped para D4.
 
 ---
+
+## Q8 — Concurrencia en mutaciones de tickets: ¿optimista o pesimista?
+
+**Estado:** CERRADA — 2026-06-09
+**Owner:** Estuardo (BL-016)
+
+### Decisión
+
+Se adopta **optimistic locking con la columna `version`** para todas las
+mutaciones de `tickets` (asignación, cambio de estado, resolución y
+escalamiento). El `UPDATE` lleva `WHERE id=? AND version=:expected_version`
+e incrementa `version`; si afecta 0 filas se devuelve **409** (Problem Details
+`conflict-version`) y el cliente hace **refetch + reintento con el `version`
+nuevo**. RFC completo en `docs/rfcs/Q8-concurrencia.md`.
+
+### Rationale
+
+1. Mejor throughput sin locks de fila retenidos y deadlock nulo; las colisiones
+   reales (dos agentes tomando el mismo ticket) son raras a la escala del sistema.
+2. Unifica el patrón con el worker de escalamiento (que ya detecta conflictos por
+   filas afectadas = 0) y hace la concurrencia explícita y testeable (BL-021).
+
+## Q7 — Cerrada — RDS sizing y disponibilidad (AZ)
+
+**Estado:** CERRADA — 2026-06-09
+**Owner:** Estuardo (BL-139)
+**ADR:** `docs/adrs/0007-rds-availability.md`
+
+### Decisión
+
+**Single-AZ en dev** (`db.t4g.micro`, `db_multi_az = false`, ~12 USD/mes) por
+costo; **Multi-AZ recomendado en prod** (`db_multi_az = true`) por alta
+disponibilidad y failover automático (RPO ~0, RTO ~60-120 s).
+
+### Rationale
+
+Resumido aquí; detalle completo en `docs/adrs/0007-rds-availability.md` y
+`docs/trade-offs/03-database.md`.
+
+1. Dev acumula costo todo el ciclo y no tiene SLA: Single-AZ minimiza gasto.
+2. Prod requiere tolerar la caída de una AZ completa: el standby síncrono de
+   Multi-AZ promueve automáticamente sin pérdida de transacciones confirmadas.
+3. El subnet group ya abarca ≥2 AZs, así que pasar a Multi-AZ es un solo cambio
+   de valor de variable, sin tocar el código del módulo.
+
+### Implementación
+
+`infra/modules/database/variables.tf:55-59` (variable `multi_az`),
+`infra/modules/database/main.tf:67` (`multi_az = var.multi_az`),
+`infra/envs/dev/dev.tfvars:12` (`db_multi_az = false`) y
+`infra/envs/prod/prod.tfvars` (`db_multi_az = true`).
+## Q9 — Cerrada
+
+**Estado:** CERRADA — 2026-06-09
+**Owner:** Estuardo (BL-130 infra · BL-040 lado API)
+**ADR:** `docs/adrs/0009-auth-worker-api.md`
+
+### Decisión
+
+La identidad del worker hacia la API se prueba con un **service JWT asimétrico
+(RS256)**. El worker (Lambda) firma un JWT corto con una **clave privada RSA-2048**
+que lee de Secrets Manager (`ticket-system/${env}/worker-jwt-private`); la API lo
+verifica con la **clave pública** (`ticket-system/${env}/worker-jwt-public`) en un
+guard dedicado (`ServiceTokenGuard`) montado sobre `/internal/v1/*`.
+
+Se eligió sobre **IAM SigV4** porque el borde del sistema es **ALB Ingress, no
+API Gateway** (Q-NET-4): SigV4 no es nativo en ALB+EKS y exigiría anteponer API
+Gateway o un verificador casero. Se descartó que el worker escribiera directo en
+RDS porque rompe la política de "API como única puerta de escritura" y salta la
+lógica de dominio (estados, RBAC, optimistic locking de Q8).
+
+### Rationale (resumen)
+
+1. **Coherente con la topología ya mergeada** — el token entra por el ALB como
+   `Authorization: Bearer`, sin componentes nuevos.
+2. **Asimetría / mínimo privilegio** — la API solo lee la clave pública y no puede
+   falsificar tokens; el worker solo lee la privada (separación por IAM en BL-131).
+3. **Verificación idiomática y testeable** — guard de NestJS que valida firma
+   RS256 + `iss=ticket-system-worker` + `aud=ticket-system-api` + `exp` ≤ 5 min.
+
+### Trade-off aceptado
+
+**Rotación manual cada 90 días** (SigV4 la daría gratis con STS), mitigada con
+runbook (`docs/runbooks/rotar-worker-jwt.md`, BL-131) y aceptación de dos claves
+públicas durante la ventana de rotación. Detalle, claims y pseudo-código del
+verificador en `docs/adrs/0009-auth-worker-api.md`.
+
+---

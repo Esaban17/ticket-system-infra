@@ -36,3 +36,30 @@ variable "expire_noncurrent_versions_days" {
   type        = number
   default     = 90
 }
+
+variable "transition_to_glacier_days" {
+  description = "Number of days after which current versions of objects under lifecycle_prefix transition from STANDARD_IA to GLACIER (cheap, archival storage for cold attachments/reports). MUST be greater than transition_to_ia_days. Set to 0 (or any non-positive value) to disable the Glacier transition entirely. Default of 90 keeps objects in IA for ~2 months before archiving."
+  type        = number
+  default     = 90
+
+  # La relación con transition_to_ia_days (glacier > IA) se valida con un
+  # precondition en main.tf: las validaciones de variable solo pueden referirse
+  # a sí mismas en Terraform < 1.9 (el CI fija ~> 1.8).
+  validation {
+    condition     = floor(var.transition_to_glacier_days) == var.transition_to_glacier_days
+    error_message = "transition_to_glacier_days must be an integer number of days (use 0 or a negative value to disable the Glacier transition)."
+  }
+}
+
+variable "expire_current_days" {
+  description = "Number of days after which CURRENT versions of objects under lifecycle_prefix are expired (a delete marker is added). MUST be greater than transition_to_glacier_days when Glacier is enabled. Set to 0 (or any non-positive value) to disable expiration of current objects (default), so attachments/reports are retained indefinitely unless overridden per environment."
+  type        = number
+  default     = 0
+
+  # La relación con transition_to_glacier_days (expire > glacier) se valida con
+  # un precondition en main.tf (ver nota arriba sobre TF < 1.9).
+  validation {
+    condition     = floor(var.expire_current_days) == var.expire_current_days
+    error_message = "expire_current_days must be an integer number of days (use 0 or a negative value to disable current-version expiration)."
+  }
+}

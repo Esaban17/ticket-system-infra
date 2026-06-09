@@ -50,6 +50,17 @@ resource "aws_s3_bucket_public_access_block" "this" {
 # ---- Lifecycle rule (scoped to attachments/) ------------------------------
 # The filter prefix is required by the rubric: lifecycle rules must NOT apply
 # to the entire bucket without a scope.
+#
+# Tiered cost optimisation for ticket attachments / resolution reports:
+#   STANDARD ──(transition_to_ia_days)──▶ STANDARD_IA
+#            ──(transition_to_glacier_days)──▶ GLACIER  (optional)
+#            ──(expire_current_days)──▶ expired         (optional)
+#
+# The Glacier transition and the current-version expiration are OPTIONAL and
+# fully driven by variables: setting their *_days inputs to <= 0 disables the
+# corresponding block via the dynamic blocks below. The module's defaults keep
+# expire_current_days = 0, so the historical behaviour (transition to IA +
+# expire noncurrent versions only) is preserved unless a caller opts in.
 
 resource "aws_s3_bucket_lifecycle_configuration" "this" {
   bucket = aws_s3_bucket.this.id
@@ -57,19 +68,54 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
   # Depends on versioning so the noncurrent rule is meaningful.
   depends_on = [aws_s3_bucket_versioning.this]
 
+  # El orden entre tiers (IA → Glacier → expiración) requiere referencias entre
+  # variables, no permitidas en validaciones de variable bajo TF < 1.9; se
+  # expresa aquí como preconditions (sí soportan referencias cruzadas).
+  lifecycle {
+    precondition {
+      condition     = var.transition_to_glacier_days <= 0 || var.transition_to_glacier_days > var.transition_to_ia_days
+      error_message = "transition_to_glacier_days debe ser mayor que transition_to_ia_days (o <= 0 para deshabilitar Glacier)."
+    }
+    precondition {
+      condition     = var.expire_current_days <= 0 || var.transition_to_glacier_days <= 0 || var.expire_current_days > var.transition_to_glacier_days
+      error_message = "expire_current_days debe ser mayor que transition_to_glacier_days cuando ambos están habilitados (o <= 0 para deshabilitarlo)."
+    }
+  }
+
   rule {
-    id     = "transition-attachments-to-ia-and-expire-noncurrent"
+    id     = "transition-attachments-tiered-and-expire"
     status = "Enabled"
 
     filter {
       prefix = var.lifecycle_prefix
     }
 
+    # Current versions move to the cheaper STANDARD_IA tier first.
     transition {
       days          = var.transition_to_ia_days
       storage_class = "STANDARD_IA"
     }
 
+    # Optional archival transition to GLACIER for cold objects.
+    dynamic "transition" {
+      for_each = var.transition_to_glacier_days > 0 ? [1] : []
+
+      content {
+        days          = var.transition_to_glacier_days
+        storage_class = "GLACIER"
+      }
+    }
+
+    # Optional final expiration of current versions (adds a delete marker).
+    dynamic "expiration" {
+      for_each = var.expire_current_days > 0 ? [1] : []
+
+      content {
+        days = var.expire_current_days
+      }
+    }
+
+    # Non-current versions (from versioning) are always cleaned up.
     noncurrent_version_expiration {
       noncurrent_days = var.expire_noncurrent_versions_days
     }

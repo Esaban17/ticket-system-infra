@@ -1,0 +1,110 @@
+# =============================================================================
+# Valores por defecto del chart de la API del ticket-system.
+# Se sobreescriben por entorno con values-dev.yaml / values-prod.yaml.
+# =============================================================================
+
+# Número de réplicas. Ignorado cuando autoscaling.enabled = true (el HPA
+# pasa a gobernar el número de pods).
+replicaCount: 1
+
+# Permiten renombrar los recursos generados sin tocar las plantillas.
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  # URI del repositorio ECR provisionado por Terraform (módulo registry).
+  # Formato: <account_id>.dkr.ecr.<region>.amazonaws.com/ticket-system-api
+  repository: ticket-system-api
+  # IfNotPresent en prod (tags inmutables); Always solo si se usa :latest.
+  pullPolicy: IfNotPresent
+  # Por defecto toma Chart.appVersion; override por entorno o por CI.
+  tag: ""
+
+# Secrets para tirar la imagen desde un registro privado (no se necesita con
+# IRSA + ECR del mismo cluster, pero se deja parametrizable).
+imagePullSecrets: []
+
+serviceAccount:
+  # Crear el ServiceAccount como parte del release.
+  create: true
+  # Nombre fijo: la trust policy del rol IRSA (BL-104) limita el sub a este SA.
+  name: api-sa
+  annotations: {}
+  # ARN del rol IAM para IRSA. Lo emite el módulo Terraform de IRSA (BL-104).
+  # Vacío = sin anotación (útil para `helm template` o entornos sin IRSA).
+  roleArn: ""
+
+# Namespace lógico de la app. La trust policy IRSA limita el sub a este ns.
+namespace: ticket-system
+
+# La API NestJS escucha en 8080 (ver app/api/src/main.ts).
+containerPort: 8080
+
+service:
+  type: ClusterIP
+  port: 80
+
+# Origen de la configuración no sensible y de los secretos. Se inyectan con
+# envFrom para no acoplar el chart a cada variable individual.
+config:
+  # ConfigMap con variables no sensibles (AWS_REGION, LOG_LEVEL, APP_ENV...).
+  configMapName: ticket-system-config
+  # Secret con valores sensibles (DB password, JWT, etc.).
+  secretName: ticket-system-secrets
+
+# Probes contra los endpoints fuera del prefijo global (/healthz, /readyz).
+probes:
+  liveness:
+    path: /healthz
+    initialDelaySeconds: 20
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    path: /readyz
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Requests/limits por contenedor. Requests = base para el scheduler y el HPA.
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+  # Opcional: descomentar en values-prod para escalar también por memoria.
+  targetMemoryUtilizationPercentage: 0
+
+podDisruptionBudget:
+  enabled: true
+  # Mantener al menos 1 pod disponible durante drains/upgrades de nodos.
+  minAvailable: 1
+  # maxUnavailable y minAvailable son mutuamente excluyentes; usar uno.
+  maxUnavailable: ""
+
+# Seguridad: contenedor no-root (la imagen ya corre como UID no privilegiado).
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

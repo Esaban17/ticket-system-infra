@@ -1,17 +1,17 @@
 // ============================================================
-// Prisma Schema — Ticket System API
+// Prisma Schema — Ticket System API (dominio completo, EP-02)
 // ============================================================
 //
-// Delivery 3 (E2E proof): the GET /v1/tickets endpoint reads rows from this
-// `tickets` table, so a real domain model is required (the D1/D2 ScaffoldProbe
-// placeholder is gone). The committed migration under prisma/migrations/ plus
-// the seed (src/seed.ts) create and populate the table — applied in-cluster by
-// the db-seed Job before the app serves traffic.
+// Modelo de E2 materializado en 5 tablas: users, tickets, ticket_events
+// (append-only), sla_rules (con seeds) y attachments. Reemplaza el modelo
+// mínimo `Ticket` del proof E2E de Delivery 3.
+//
+// Las constraints CHECK, la sequence de ticket_number, los índices parciales y
+// los GRANT/REVOKE del rol de aplicación se definen a mano en la migración SQL
+// (prisma/migrations/), porque Prisma no los expresa en el schema.
 
 generator client {
-  provider = "prisma-client-js"
-  // "native" for local dev; "debian-openssl-3.0.x" for the node:20-slim
-  // (Debian bookworm) runtime image used in EKS.
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
@@ -20,12 +20,167 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Ticket {
-  id        Int      @id @default(autoincrement())
-  title     String
-  status    String   @default("open")
-  priority  String   @default("medium")
-  createdAt DateTime @default(now())
+// ── Enums ────────────────────────────────────────────────────────────────────
 
+enum Role {
+  reportante
+  agente
+  administrador
+
+  @@map("user_role")
+}
+
+enum TicketType {
+  incidente
+  solicitud
+
+  @@map("ticket_type")
+}
+
+enum Priority {
+  critica
+  alta
+  media
+  baja
+
+  @@map("ticket_priority")
+}
+
+enum TicketStatus {
+  abierto
+  en_progreso
+  resuelto
+
+  @@map("ticket_status")
+}
+
+enum AttachmentStatus {
+  pending
+  attached
+  expired
+
+  @@map("attachment_status")
+}
+
+enum EventType {
+  ticket_creado
+  asignacion
+  cambio_estado
+  resolucion
+  escalamiento
+  comentario
+  adjunto_agregado
+  adjunto_descargado
+
+  @@map("ticket_event_type")
+}
+
+// ── users ────────────────────────────────────────────────────────────────────
+
+model User {
+  id          String   @id @default(uuid()) @db.Uuid
+  email       String   @unique
+  role        Role     @default(reportante)
+  notifyEmail Boolean  @default(true) @map("notify_email")
+  notifySlack Boolean  @default(false) @map("notify_slack")
+  slackUserId String?  @map("slack_user_id")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  reportedTickets Ticket[]      @relation("reporter")
+  assignedTickets Ticket[]      @relation("assignee")
+  events          TicketEvent[] @relation("actor")
+  attachments     Attachment[]  @relation("uploader")
+
+  @@map("users")
+}
+
+// ── tickets ──────────────────────────────────────────────────────────────────
+
+model Ticket {
+  id              String       @id @default(uuid()) @db.Uuid
+  ticketNumber    String       @unique @default(dbgenerated("('TKT-' || lpad(nextval('ticket_number_seq')::text, 4, '0'))")) @map("ticket_number")
+  type            TicketType
+  title           String
+  description     String
+  severity        Int // 1..4 (CHECK en la migración)
+  impact          Int // 1..4 (CHECK en la migración)
+  priority        Priority
+  status          TicketStatus @default(abierto)
+  reporterId      String       @map("reporter_id") @db.Uuid
+  assigneeId      String?      @map("assignee_id") @db.Uuid
+  escalationLevel Int          @default(0) @map("escalation_level")
+  slaDueAt        DateTime?    @map("sla_due_at") @db.Timestamptz(6)
+  version         Int          @default(0)
+  rootCause       String?      @map("root_cause")
+  solution        String?
+  resolvedAt      DateTime?    @map("resolved_at") @db.Timestamptz(6)
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  reporter    User          @relation("reporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  assignee    User?         @relation("assignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+  events      TicketEvent[]
+  attachments Attachment[]
+
+  @@index([status, priority, createdAt])
+  @@index([assigneeId, status])
+  @@index([reporterId])
   @@map("tickets")
+}
+
+// ── ticket_events (append-only) ──────────────────────────────────────────────
+
+model TicketEvent {
+  id        String    @id @default(uuid()) @db.Uuid
+  ticketId  String    @map("ticket_id") @db.Uuid
+  actorId   String    @map("actor_id") @db.Uuid
+  eventType EventType @map("event_type")
+  payload   Json      @default("{}")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  actor  User   @relation("actor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_events")
+}
+
+// ── sla_rules ────────────────────────────────────────────────────────────────
+
+model SlaRule {
+  id                   String   @id @default(uuid()) @db.Uuid
+  priority             Priority @unique
+  timeToAssignMinutes  Int      @map("time_to_assign_minutes")
+  timeToResolveMinutes Int      @map("time_to_resolve_minutes")
+  escalationL1Minutes  Int      @map("escalation_l1_minutes")
+  escalationL2Minutes  Int      @map("escalation_l2_minutes")
+  active               Boolean  @default(true)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("sla_rules")
+}
+
+// ── attachments ──────────────────────────────────────────────────────────────
+
+model Attachment {
+  id               String           @id @default(uuid()) @db.Uuid
+  s3Key            String           @unique @map("s3_key")
+  originalFilename String           @map("original_filename")
+  contentType      String           @map("content_type")
+  sizeBytes        Int              @map("size_bytes")
+  uploaderId       String           @map("uploader_id") @db.Uuid
+  ticketId         String?          @map("ticket_id") @db.Uuid
+  status           AttachmentStatus @default(pending)
+  expiresAt        DateTime?        @map("expires_at") @db.Timestamptz(6)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  attachedAt       DateTime?        @map("attached_at") @db.Timestamptz(6)
+
+  uploader User    @relation("uploader", fields: [uploaderId], references: [id], onDelete: Restrict)
+  ticket   Ticket? @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+
+  @@index([uploaderId, status])
+  @@index([ticketId])
+  @@map("attachments")
 }

@@ -9,6 +9,7 @@ import { LoggingInterceptor } from '@/common/interceptors/logging.interceptor';
 import { ObservabilityModule } from '@/common/observability.module';
 import { RequestIdMiddleware } from '@/common/middleware/request-id.middleware';
 import { PrismaModule } from '@/prisma/prisma.module';
+import { UsersModule } from '@/users/users.module';
 import { TicketsModule } from '@/tickets/tickets.module';
 import { HealthController } from '@/health/health.controller';
 
@@ -38,8 +39,9 @@ import { HealthController } from '@/health/health.controller';
     // Observabilidad (EP-18): logger JSON + métricas EMF, globales.
     ObservabilityModule,
 
-    // Delivery 3: persistence + the end-to-end proof resource.
+    // Persistencia + dominio.
     PrismaModule,
+    UsersModule,
     TicketsModule,
   ],
   controllers: [
