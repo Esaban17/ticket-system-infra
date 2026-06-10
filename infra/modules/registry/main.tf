@@ -18,6 +18,10 @@ resource "aws_ecr_repository" "this" {
   name                 = var.repository_name
   image_tag_mutability = "IMMUTABLE"
 
+  # El CD empuja imágenes continuamente; sin esto `terraform destroy` falla
+  # con RepositoryNotEmptyException (visto en el teardown del 2026-06-10).
+  force_delete = true
+
   image_scanning_configuration {
     scan_on_push = true
   }
