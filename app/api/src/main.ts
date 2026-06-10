@@ -28,7 +28,9 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: corsOrigins,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    // Idempotency-Key: requerido por el contrato en POST /v1/tickets (BL-007);
+    // sin él, el preflight CORS del navegador bloquea la creación de tickets.
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
     credentials: true,
   });
 
