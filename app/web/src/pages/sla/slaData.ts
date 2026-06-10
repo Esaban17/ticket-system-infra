@@ -34,11 +34,15 @@ export async function fetchUnresolvedTickets(): Promise<Ticket[]> {
 
 /** Vencido: slaDueAt en el pasado (y el ticket no está resuelto). */
 export function isOverdue(ticket: Ticket, nowMs: number): boolean {
+  // Defensa: tickets antiguos pueden venir sin slaDueAt (null en BD);
+  // new Date(null) sería la época Unix y los marcaría como vencidos hace décadas.
+  if (!ticket.slaDueAt) return false;
   return new Date(ticket.slaDueAt).getTime() < nowMs;
 }
 
 /** Milisegundos transcurridos desde que venció el SLA (0 si aún no vence). */
 export function overdueMs(ticket: Ticket, nowMs: number): number {
+  if (!ticket.slaDueAt) return 0;
   return Math.max(0, nowMs - new Date(ticket.slaDueAt).getTime());
 }
 
