@@ -8,6 +8,7 @@ import { HttpExceptionFilter } from '@/common/filters/http-exception.filter';
 import { LoggingInterceptor } from '@/common/interceptors/logging.interceptor';
 import { ObservabilityModule } from '@/common/observability.module';
 import { RequestIdMiddleware } from '@/common/middleware/request-id.middleware';
+import { AuthModule } from '@/auth/auth.module';
 import { JwtAuthGuard } from '@/auth/jwt-auth.guard';
 import { RolesGuard } from '@/auth/roles.guard';
 import { PrismaModule } from '@/prisma/prisma.module';
@@ -45,6 +46,7 @@ import { HealthController } from '@/health/health.controller';
 
     // Persistencia + dominio.
     PrismaModule,
+    AuthModule,
     UsersModule,
     TicketsModule,
     AttachmentsModule,
