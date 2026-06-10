@@ -147,8 +147,11 @@ module "alb_controller" {
   # mataba los pods del controller mientras el Ingress esperaba a que ese mismo
   # controller procesara su finalizer y borrara el ALB (deadlock del teardown
   # del 2026-06-10). depends_on al módulo completo fuerza el orden correcto:
-  # ingress → controller → nodos.
-  depends_on = [module.eks]
+  # ingress → controller → nodos. module.network se suma porque el controller
+  # necesita salida a los APIs de EC2/ELB (sin VPC endpoint aquí) para borrar
+  # el ALB: si el NAT cae en paralelo, la eliminación muere por i/o timeout
+  # (segundo teardown del 2026-06-10).
+  depends_on = [module.eks, module.network]
 }
 
 # ---- Ingress + app (Deliverable C + D) -----------------------------------

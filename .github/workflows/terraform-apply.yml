@@ -17,6 +17,12 @@ concurrency:
 jobs:
   terraform-apply:
     name: Apply (dev)
+    # Kill-switch de costos: con la variable de repo INFRA_AUTO_APPLY en
+    # "false" el apply-on-merge se salta (el stack debe quedarse destruido).
+    # Sin la variable o con cualquier otro valor, aplica normal (Deliverable E).
+    # Visto el 2026-06-10: un merge a infra/** re-aplicó el stack en plena
+    # ventana de teardown porque compartía el concurrency group con destroy.
+    if: ${{ vars.INFRA_AUTO_APPLY != 'false' }}
     runs-on: ubuntu-latest
 
     permissions:
