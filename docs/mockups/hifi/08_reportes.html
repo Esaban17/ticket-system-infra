@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SRE/Ops Tickets - Reportes de resolución</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #faf8ff;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c7c4d8;
+            border-radius: 10px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-bright": "#faf8ff",
+                      "on-tertiary-container": "#ffd2be",
+                      "surface-container-lowest": "#ffffff",
+                      "on-secondary-fixed": "#171c25",
+                      "on-secondary-container": "#60646f",
+                      "secondary-fixed-dim": "#c2c6d3",
+                      "background": "#faf8ff",
+                      "on-tertiary": "#ffffff",
+                      "tertiary-fixed": "#ffdbcc",
+                      "outline-variant": "#c7c4d8",
+                      "on-surface": "#131b2e",
+                      "surface-dim": "#d2d9f4",
+                      "inverse-primary": "#c3c0ff",
+                      "surface": "#faf8ff",
+                      "secondary": "#5a5e69",
+                      "outline": "#777587",
+                      "primary-container": "#4f46e5",
+                      "on-background": "#131b2e",
+                      "surface-variant": "#dae2fd",
+                      "surface-container": "#eaedff",
+                      "surface-container-highest": "#dae2fd",
+                      "surface-tint": "#4d44e3",
+                      "error-container": "#ffdad6",
+                      "on-error-container": "#93000a",
+                      "on-secondary-fixed-variant": "#424751",
+                      "primary-fixed": "#e2dfff",
+                      "secondary-container": "#dee2ef",
+                      "on-surface-variant": "#464555",
+                      "on-secondary": "#ffffff",
+                      "inverse-surface": "#283044",
+                      "primary": "#3525cd",
+                      "on-tertiary-fixed-variant": "#7b2f00",
+                      "on-primary-fixed": "#0f0069",
+                      "tertiary-container": "#a44100",
+                      "on-primary-container": "#dad7ff",
+                      "on-primary": "#ffffff",
+                      "error": "#ba1a1a",
+                      "tertiary": "#7e3000",
+                      "inverse-on-surface": "#eef0ff",
+                      "primary-fixed-dim": "#c3c0ff",
+                      "surface-container-low": "#f2f3ff",
+                      "secondary-fixed": "#dee2ef",
+                      "on-tertiary-fixed": "#351000",
+                      "tertiary-fixed-dim": "#ffb695",
+                      "on-primary-fixed-variant": "#3323cc",
+                      "surface-container-high": "#e2e7ff",
+                      "on-error": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "md": "16px",
+                      "gutter": "16px",
+                      "base": "4px",
+                      "xs": "4px",
+                      "xl": "32px",
+                      "sm": "8px",
+                      "lg": "24px",
+                      "container-max": "1440px"
+              },
+              "fontFamily": {
+                      "headline-sm": ["Inter"],
+                      "code-sm": ["JetBrains Mono"],
+                      "body-lg": ["Inter"],
+                      "label-md": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "body-sm": ["Inter"],
+                      "body-md": ["Inter"],
+                      "headline-lg": ["Inter"]
+              },
+              "fontSize": {
+                      "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                      "code-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                      "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                      "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+              }
+            },
+          },
+        }
+      </script>
+</head>
+<body class="bg-surface-bright text-on-surface flex min-h-screen">
+<!-- SideNavBar Anchor -->
+<aside class="w-[240px] h-full fixed left-0 top-0 bg-surface-container-low border-r border-outline-variant flex flex-col py-md z-[60]">
+<div class="px-md mb-xl">
+<h1 class="font-headline-sm text-headline-sm font-bold text-on-surface">SRE/Ops Tickets</h1>
+<p class="text-on-surface-variant font-body-sm opacity-70">Operaciones de Sistema</p>
+</div>
+<nav class="flex-1 space-y-1 px-sm">
+<a class="flex items-center gap-3 px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-variant transition-colors group" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-body-md text-body-md">Inicio</span>
+</a>
+<a class="flex items-center gap-3 px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-variant transition-colors group" href="#">
+<span class="material-symbols-outlined">confirmation_number</span>
+<span class="font-body-md text-body-md">Cola de tickets</span>
+</a>
+<!-- Active State: Reportes -->
+<a class="flex items-center gap-3 px-md py-sm rounded-lg bg-secondary-container text-on-secondary-container font-bold border-r-4 border-primary transition-colors group" href="#">
+<span class="material-symbols-outlined">assessment</span>
+<span class="font-body-md text-body-md">Reportes</span>
+</a>
+<a class="flex items-center gap-3 px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-variant transition-colors group" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Configuración</span>
+</a>
+</nav>
+<div class="mt-auto px-md flex items-center gap-3 pt-md border-t border-outline-variant">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-bold">US</div>
+<div class="overflow-hidden">
+<p class="text-body-sm font-bold truncate">Usuario SRE</p>
+<p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Administrador</p>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 ml-[240px] flex flex-col min-h-screen">
+<!-- TopNavBar Anchor -->
+<header class="h-16 px-lg sticky top-0 bg-surface border-b border-outline-variant flex justify-between items-center z-50">
+<div class="flex items-center gap-4 flex-1 max-w-md">
+<div class="relative w-full focus-within:ring-2 focus-within:ring-primary-container rounded-lg transition-all">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-4 py-2 text-body-md focus:ring-0" placeholder="Buscar reportes o agentes..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors text-on-surface-variant relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="h-8 w-[1px] bg-outline-variant mx-2"></div>
+<img alt="Avatar del Ingeniero" class="w-8 h-8 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB54KBh5oSUlrLEGuK-t6oIBig-NRgHAYLQ1XG_5BhrjycH1RWdUP3XsQVvimsE7-6zIHImmN4BVSLoxO-RaaOR6iauUobGXv0HOovaXbLrSo5JKfPYqXIytmNMljtmsOR20vjM8GVFHyKZ-T3AsW3qUHprbw0JYXoNSKhYUnW1zwUYUdz8ilbXz8RLtBAspgzXGJ4dGJIoM7YAhXkaDN_4ZEW_8kr7nf1jqirkETTIfXD3ydz3AbtRfK42QQEXnD-dM75d_knJ9AQ"/>
+</div>
+</header>
+<!-- Canvas -->
+<div class="p-lg space-y-lg max-w-container-max mx-auto w-full">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-md">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Reportes de resolución</h2>
+<p class="text-on-surface-variant font-body-md">Métricas detalladas de eficiencia y desempeño del equipo SRE.</p>
+</div>
+<button class="flex items-center gap-2 bg-primary text-on-primary px-lg py-sm rounded-lg font-label-md hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                    Descargar CSV
+                </button>
+</div>
+<!-- Filters Bar -->
+<div class="bg-surface-container-lowest border border-outline-variant p-md rounded-xl flex flex-wrap items-end gap-md shadow-sm">
+<div class="flex-1 min-w-[200px]">
+<label class="block font-label-md text-on-surface-variant mb-1">Periodo</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary text-[18px]">calendar_today</span>
+<input class="w-full bg-surface-bright border-outline-variant rounded px-10 py-1.5 text-body-md focus:ring-primary focus:border-primary" readonly="" type="text" value="01 abr 2026 – 30 abr 2026"/>
+</div>
+</div>
+<div class="flex-1 min-w-[150px]">
+<label class="block font-label-md text-on-surface-variant mb-1">Equipo</label>
+<select class="w-full bg-surface-bright border-outline-variant rounded py-1.5 text-body-md focus:ring-primary focus:border-primary">
+<option>Todos</option>
+<option>SRE Backend</option>
+<option>Ops Cloud</option>
+</select>
+</div>
+<div class="flex-1 min-w-[150px]">
+<label class="block font-label-md text-on-surface-variant mb-1">Categoría</label>
+<select class="w-full bg-surface-bright border-outline-variant rounded py-1.5 text-body-md focus:ring-primary focus:border-primary">
+<option>Todas</option>
+<option>Backend</option>
+<option>Infraestructura</option>
+<option>Base de datos</option>
+</select>
+</div>
+<button class="bg-secondary-container text-on-secondary-container px-lg py-1.5 rounded font-label-md hover:bg-surface-variant transition-colors border border-outline-variant">
+                    Aplicar Filtros
+                </button>
+</div>
+<!-- KPI Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md">
+<div class="bg-surface-container-lowest border border-outline-variant p-lg rounded-xl flex items-center gap-lg">
+<div class="w-12 h-12 rounded-lg bg-primary-container/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[32px]">task_alt</span>
+</div>
+<div>
+<p class="text-on-surface-variant font-label-md uppercase tracking-wider">Tickets resueltos</p>
+<h3 class="text-headline-md font-bold text-on-surface">187</h3>
+<p class="text-[11px] text-primary flex items-center gap-1 font-bold">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> +12% vs mes ant.
+                        </p>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-lg rounded-xl flex items-center gap-lg">
+<div class="w-12 h-12 rounded-lg bg-tertiary-fixed/30 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-[32px]">schedule</span>
+</div>
+<div>
+<p class="text-on-surface-variant font-label-md uppercase tracking-wider">Tiempo promedio</p>
+<h3 class="text-headline-md font-bold text-on-surface">2h 47m</h3>
+<p class="text-[11px] text-on-surface-variant opacity-60">Objetivo: &lt;3h</p>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-lg rounded-xl flex items-center gap-lg">
+<div class="w-12 h-12 rounded-lg bg-secondary-container flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined text-[32px]">verified</span>
+</div>
+<div>
+<p class="text-on-surface-variant font-label-md uppercase tracking-wider">Cumplimiento SLA</p>
+<h3 class="text-headline-md font-bold text-on-surface">92%</h3>
+<div class="w-24 h-1.5 bg-outline-variant rounded-full mt-2 overflow-hidden">
+<div class="bg-primary h-full w-[92%]"></div>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-lg rounded-xl flex items-center gap-lg">
+<div class="w-12 h-12 rounded-lg bg-error-container/20 flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-[32px]">history</span>
+</div>
+<div>
+<p class="text-on-surface-variant font-label-md uppercase tracking-wider">Reabiertos</p>
+<h3 class="text-headline-md font-bold text-on-surface">6</h3>
+<p class="text-[11px] text-error flex items-center gap-1 font-bold">
+<span class="material-symbols-outlined text-[14px]">warning</span> Crítico (&gt;5)
+                        </p>
+</div>
+</div>
+</div>
+<!-- Dashboard Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-lg items-start">
+<!-- Resolution by Category (Bento Style) -->
+<section class="lg:col-span-5 bg-surface-container-lowest border border-outline-variant rounded-xl p-lg h-full overflow-hidden flex flex-col">
+<div class="flex items-center justify-between mb-lg">
+<h4 class="font-headline-sm text-on-surface">Resolución por categoría</h4>
+<span class="material-symbols-outlined text-on-surface-variant opacity-40">bar_chart</span>
+</div>
+<div class="space-y-md flex-1">
+<!-- Horizontal Bars -->
+<div class="space-y-sm">
+<div class="flex justify-between text-body-sm mb-1">
+<span class="font-bold text-on-surface">Backend</span>
+<span class="text-on-surface-variant">62 tickets</span>
+</div>
+<div class="w-full h-3 bg-surface-container rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 100%"></div>
+</div>
+</div>
+<div class="space-y-sm">
+<div class="flex justify-between text-body-sm mb-1">
+<span class="font-bold text-on-surface">Infraestructura</span>
+<span class="text-on-surface-variant">48 tickets</span>
+</div>
+<div class="w-full h-3 bg-surface-container rounded-full overflow-hidden">
+<div class="bg-primary/80 h-full rounded-full" style="width: 77%"></div>
+</div>
+</div>
+<div class="space-y-sm">
+<div class="flex justify-between text-body-sm mb-1">
+<span class="font-bold text-on-surface">Base de datos</span>
+<span class="text-on-surface-variant">31 tickets</span>
+</div>
+<div class="w-full h-3 bg-surface-container rounded-full overflow-hidden">
+<div class="bg-primary/60 h-full rounded-full" style="width: 50%"></div>
+</div>
+</div>
+<div class="space-y-sm">
+<div class="flex justify-between text-body-sm mb-1">
+<span class="font-bold text-on-surface">Frontend</span>
+<span class="text-on-surface-variant">27 tickets</span>
+</div>
+<div class="w-full h-3 bg-surface-container rounded-full overflow-hidden">
+<div class="bg-primary/40 h-full rounded-full" style="width: 43%"></div>
+</div>
+</div>
+<div class="space-y-sm">
+<div class="flex justify-between text-body-sm mb-1">
+<span class="font-bold text-on-surface">Redes</span>
+<span class="text-on-surface-variant">19 tickets</span>
+</div>
+<div class="w-full h-3 bg-surface-container rounded-full overflow-hidden">
+<div class="bg-primary/20 h-full rounded-full" style="width: 30%"></div>
+</div>
+</div>
+</div>
+<div class="mt-lg p-md bg-surface-bright rounded-lg border border-outline-variant/30">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">lightbulb</span>
+<p class="text-[12px] text-on-surface-variant">Backend e Infra representan el 58.8% de la carga total del mes.</p>
+</div>
+</div>
+</section>
+<!-- Performance Table -->
+<section class="lg:col-span-7 bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden flex flex-col">
+<div class="p-lg border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+<h4 class="font-headline-sm text-on-surface">Desempeño por agente</h4>
+<div class="flex gap-2">
+<button class="p-1 hover:bg-outline-variant/20 rounded"><span class="material-symbols-outlined text-[20px]">filter_list</span></button>
+<button class="p-1 hover:bg-outline-variant/20 rounded"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</div>
+</div>
+<div class="overflow-x-auto custom-scrollbar">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container text-on-surface-variant">
+<th class="px-md py-sm font-label-md">Agente</th>
+<th class="px-md py-sm font-label-md text-center">Tickets</th>
+<th class="px-md py-sm font-label-md">Tiempo Prom.</th>
+<th class="px-md py-sm font-label-md">% SLA</th>
+<th class="px-md py-sm font-label-md text-center">Reabiertos</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Row 1 -->
+<tr class="hover:bg-primary-container/5 transition-colors group">
+<td class="px-md py-3 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-dim flex items-center justify-center font-bold text-[10px]">LS</div>
+<div>
+<p class="font-body-md font-bold">Luis SRE</p>
+<p class="text-[10px] text-on-surface-variant">Nivel 3</p>
+</div>
+</td>
+<td class="px-md py-3 text-center font-code-sm">52</td>
+<td class="px-md py-3 font-code-sm">1h 58m</td>
+<td class="px-md py-3">
+<span class="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold text-[11px]">96%</span>
+</td>
+<td class="px-md py-3 text-center">
+<span class="text-on-surface-variant font-code-sm">1</span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-primary-container/5 transition-colors">
+<td class="px-md py-3 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-dim flex items-center justify-center font-bold text-[10px]">AS</div>
+<div>
+<p class="font-body-md font-bold">Ana SRE</p>
+<p class="text-[10px] text-on-surface-variant">Nivel 3</p>
+</div>
+</td>
+<td class="px-md py-3 text-center font-code-sm">48</td>
+<td class="px-md py-3 font-code-sm">2h 12m</td>
+<td class="px-md py-3">
+<span class="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold text-[11px]">94%</span>
+</td>
+<td class="px-md py-3 text-center">
+<span class="text-on-surface-variant font-code-sm">2</span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-primary-container/5 transition-colors">
+<td class="px-md py-3 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-dim flex items-center justify-center font-bold text-[10px]">PO</div>
+<div>
+<p class="font-body-md font-bold">Pedro Ops</p>
+<p class="text-[10px] text-on-surface-variant">Nivel 2</p>
+</div>
+</td>
+<td class="px-md py-3 text-center font-code-sm">37</td>
+<td class="px-md py-3 font-code-sm">3h 24m</td>
+<td class="px-md py-3">
+<span class="bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded-full font-bold text-[11px]">89%</span>
+</td>
+<td class="px-md py-3 text-center">
+<span class="text-on-surface-variant font-code-sm">1</span>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-primary-container/5 transition-colors">
+<td class="px-md py-3 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-dim flex items-center justify-center font-bold text-[10px]">MD</div>
+<div>
+<p class="font-body-md font-bold">María Dev</p>
+<p class="text-[10px] text-on-surface-variant">Onboarding</p>
+</div>
+</td>
+<td class="px-md py-3 text-center font-code-sm">28</td>
+<td class="px-md py-3 font-code-sm">2h 45m</td>
+<td class="px-md py-3">
+<span class="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold text-[11px]">93%</span>
+</td>
+<td class="px-md py-3 text-center">
+<span class="text-on-surface-variant font-code-sm">0</span>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-primary-container/5 transition-colors">
+<td class="px-md py-3 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-error-container/20 flex items-center justify-center font-bold text-[10px] text-error">EC</div>
+<div>
+<p class="font-body-md font-bold">Equipo on-call</p>
+<p class="text-[10px] text-on-surface-variant">Rotativo</p>
+</div>
+</td>
+<td class="px-md py-3 text-center font-code-sm">22</td>
+<td class="px-md py-3 font-code-sm">4h 12m</td>
+<td class="px-md py-3">
+<span class="bg-error-container text-on-error-container px-2 py-0.5 rounded-full font-bold text-[11px]">82%</span>
+</td>
+<td class="px-md py-3 text-center">
+<span class="text-error font-code-sm font-bold">2</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+<!-- Footer Notes -->
+<footer class="pt-xl pb-lg">
+<p class="text-on-surface-variant text-[11px] italic opacity-60">* Datos calculados sobre tickets resueltos en el periodo seleccionado. Excluye tickets cancelados o duplicados. Reporte generado automáticamente por el sistema SRE/Ops Engine.</p>
+</footer>
+</div>
+</main>
+<!-- FAB (Suppressed based on context: Details/Settings/Reporting usually don't need it) -->
+<script>
+        // Micro-interactions and hover effects
+        document.querySelectorAll('tr').forEach(row => {
+            row.addEventListener('mouseenter', () => {
+                row.style.transform = 'translateX(4px)';
+                row.style.transition = 'transform 0.2s ease-out';
+            });
+            row.addEventListener('mouseleave', () => {
+                row.style.transform = 'translateX(0)';
+            });
+        });
+
+        // Simulating loading for the Apply Filters button
+        const applyBtn = document.querySelector('button.bg-secondary-container');
+        applyBtn.addEventListener('click', function() {
+            this.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">refresh</span> Actualizando...';
+            this.disabled = true;
+            setTimeout(() => {
+                this.innerHTML = 'Aplicar Filtros';
+                this.disabled = false;
+            }, 800);
+        });
+    </script>
+</body></html>

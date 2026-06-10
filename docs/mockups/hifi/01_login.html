@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SRE Ops Central - Login</title>
+<!-- Google Fonts: Inter & JetBrains Mono -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "outline": "#777587",
+                "surface-bright": "#faf8ff",
+                "background": "#faf8ff",
+                "error-container": "#ffdad6",
+                "error": "#ba1a1a",
+                "surface-variant": "#dae2fd",
+                "on-tertiary-fixed": "#351000",
+                "secondary-fixed-dim": "#c2c6d3",
+                "on-surface": "#131b2e",
+                "surface-dim": "#d2d9f4",
+                "on-tertiary": "#ffffff",
+                "on-secondary-fixed-variant": "#424751",
+                "on-secondary": "#ffffff",
+                "primary-fixed-dim": "#c3c0ff",
+                "surface-container-high": "#e2e7ff",
+                "tertiary": "#7e3000",
+                "surface-container-highest": "#dae2fd",
+                "surface-container-low": "#f2f3ff",
+                "tertiary-fixed-dim": "#ffb695",
+                "inverse-primary": "#c3c0ff",
+                "on-error": "#ffffff",
+                "on-tertiary-fixed-variant": "#7b2f00",
+                "tertiary-container": "#a44100",
+                "inverse-surface": "#283044",
+                "secondary-fixed": "#dee2ef",
+                "on-secondary-container": "#60646f",
+                "surface-container": "#eaedff",
+                "on-secondary-fixed": "#171c25",
+                "on-tertiary-container": "#ffd2be",
+                "primary-container": "#4f46e5",
+                "on-surface-variant": "#464555",
+                "tertiary-fixed": "#ffdbcc",
+                "outline-variant": "#c7c4d8",
+                "surface-container-lowest": "#ffffff",
+                "primary": "#3525cd",
+                "on-background": "#131b2e",
+                "secondary": "#5a5e69",
+                "surface-tint": "#4d44e3",
+                "surface": "#faf8ff",
+                "secondary-container": "#dee2ef",
+                "on-primary-container": "#dad7ff",
+                "on-primary-fixed": "#0f0069",
+                "on-primary": "#ffffff",
+                "on-primary-fixed-variant": "#3323cc",
+                "on-error-container": "#93000a",
+                "primary-fixed": "#e2dfff",
+                "inverse-on-surface": "#eef0ff"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+            },
+            "spacing": {
+                "xs": "4px",
+                "container-max": "1440px",
+                "xl": "32px",
+                "sm": "8px",
+                "lg": "24px",
+                "gutter": "16px",
+                "md": "16px",
+                "base": "4px"
+            },
+            "fontFamily": {
+                "headline-lg": ["Inter"],
+                "headline-md": ["Inter"],
+                "code-sm": ["JetBrains Mono"],
+                "headline-sm": ["Inter"],
+                "body-md": ["Inter"],
+                "label-md": ["Inter"],
+                "body-lg": ["Inter"],
+                "body-sm": ["Inter"]
+            },
+            "fontSize": {
+                "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                "code-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f8fafc; /* slate-50 */
+      }
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        display: inline-block;
+        line-height: 1;
+      }
+      /* Custom focus ring for indigo-600 with 2px indigo-100 glow */
+      .custom-input-focus:focus {
+        border-color: #4f46e5;
+        outline: none;
+        box-shadow: 0 0 0 2px #e0e7ff;
+      }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-center items-center overflow-x-hidden">
+<!-- Top Navigation (Shell suppressed for login, but maintaining identity) -->
+<header class="fixed top-0 left-0 w-full bg-surface-container-lowest border-b border-outline-variant py-sm px-lg flex justify-between items-center z-50">
+<div class="font-headline-sm text-headline-sm font-bold text-primary">
+            SRE Ops Central
+        </div>
+<div class="hidden md:flex gap-md">
+<span class="font-label-md text-label-md text-secondary uppercase tracking-widest">Internal System v2.4</span>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex items-center justify-center w-full px-gutter">
+<div class="w-full max-w-[440px] animate-in fade-in slide-in-from-bottom-4 duration-700">
+<!-- Login Card -->
+<div class="bg-white border border-slate-200 rounded-xl p-xl shadow-sm">
+<!-- Brand Identity -->
+<div class="flex items-center gap-sm mb-lg">
+<span class="material-symbols-outlined text-primary text-[32px]">terminal</span>
+<h1 class="font-headline-sm text-headline-sm text-primary">SRE/Ops Tickets</h1>
+</div>
+<!-- Form Header -->
+<div class="mb-lg">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-xs">Iniciar sesión</h2>
+<p class="font-body-md text-body-md text-secondary">Sistema interno de gestión de tickets</p>
+</div>
+<!-- Form Fields -->
+<form class="space-y-md" onsubmit="return false;">
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface-variant block" for="email">Correo electrónico</label>
+<input class="w-full px-md py-sm rounded border border-slate-200 font-body-md text-body-md text-on-surface custom-input-focus transition-all duration-200" id="email" placeholder="usuario@ticket-system.dev" required="" type="email"/>
+</div>
+<div class="space-y-xs">
+<div class="flex justify-between items-center">
+<label class="font-label-md text-label-md text-on-surface-variant block" for="password">Contraseña</label>
+<a class="font-label-md text-label-md text-primary hover:underline transition-opacity duration-150" href="#">¿Olvidaste tu contraseña?</a>
+</div>
+<input class="w-full px-md py-sm rounded border border-slate-200 font-body-md text-body-md text-on-surface custom-input-focus transition-all duration-200" id="password" placeholder="••••••••" required="" type="password"/>
+</div>
+<!-- Development Authentication Info -->
+<div class="bg-indigo-50 border border-indigo-100 rounded p-sm flex gap-sm items-start mt-md">
+<span class="material-symbols-outlined text-indigo-600 text-sm mt-[2px]">info</span>
+<p class="font-body-sm text-body-sm text-indigo-600 leading-tight">
+                            Autenticación de desarrollo: la contraseña no se verifica (JWT mock).
+                        </p>
+</div>
+<!-- Primary Action -->
+<button class="w-full bg-primary-container text-on-primary py-sm rounded-lg font-headline-sm text-headline-sm hover:opacity-90 active:scale-[0.98] transition-all duration-200 flex justify-center items-center gap-sm mt-lg" type="submit">
+                        Iniciar sesión
+                        <span class="material-symbols-outlined text-md">login</span>
+</button>
+</form>
+<!-- SSO Alternative -->
+<div class="mt-xl pt-lg border-t border-slate-100">
+<button class="w-full border border-slate-200 bg-white text-secondary hover:bg-slate-50 py-sm rounded-lg font-body-md text-body-md flex justify-center items-center gap-sm transition-colors duration-200">
+<img alt="Google Logo" class="w-5 h-5" data-alt="A clean, isolated Google logo icon with its iconic primary colors of blue, red, yellow, and green. The icon is presented in a minimalist high-resolution vector style, perfectly centered against a transparent background to maintain a professional corporate identity. The lighting is flat and even, ensuring clarity for a modern interface design." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQlTS857WQ8BAQHldmNmT4uhzHpPJVDwNjym8WXc7b3ThZ7WyX5Dp5lFAJ4toNcsnXu6uNMb2sGa_IBkFWTeyL2F2_c-zDDheDAv9xW0yFXhLBHn07xBN4KWEn47qYH_sTJMTiqV8u49ibQc-W6n1N_jjXu_4v6oaqh9shoFrIB4eUIpHCe-14r2VhfaOcHwQC3kOFwCEMQvug17OfG1-qIUpEUU9llBuvo3lSuOqmWmt_ZRCDisW_8hUzYpfPGcAmYCjsYlBfPdg"/>
+                        Ingresar con SSO Corporativo
+                    </button>
+</div>
+</div>
+<!-- Accessibility/Links -->
+<div class="mt-lg flex justify-center gap-lg">
+<a class="font-label-md text-label-md text-secondary hover:text-primary transition-colors" href="#">Soporte Técnico</a>
+<span class="text-outline-variant">•</span>
+<a class="font-label-md text-label-md text-secondary hover:text-primary transition-colors" href="#">Estado del Sistema</a>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="w-full py-lg px-xl flex flex-col justify-center items-center bg-transparent border-t border-transparent">
+<p class="font-body-sm text-body-sm text-secondary text-center">
+            © 2026 SRE/Ops System — Confidencial
+        </p>
+</footer>
+<!-- Background Decoration (Subtle Grid) -->
+<div class="fixed inset-0 -z-10 opacity-[0.03] pointer-events-none" style="background-image: radial-gradient(#3525cd 0.5px, transparent 0.5px); background-size: 24px 24px;"></div>
+<script>
+        // Micro-interaction for the login button
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const btn = e.target.querySelector('button');
+            const originalContent = btn.innerHTML;
+            
+            btn.disabled = true;
+            btn.innerHTML = `<span class="material-symbols-outlined animate-spin">sync</span> Validando...`;
+            
+            setTimeout(() => {
+                btn.innerHTML = `<span class="material-symbols-outlined">check_circle</span> Acceso concedido`;
+                btn.classList.replace('bg-primary-container', 'bg-green-600');
+                
+                // Mock redirect after success
+                setTimeout(() => {
+                    alert('Acceso exitoso al panel de SRE Ops Central (Demo)');
+                    btn.disabled = false;
+                    btn.innerHTML = originalContent;
+                    btn.classList.replace('bg-green-600', 'bg-primary-container');
+                }, 1000);
+            }, 1500);
+        });
+
+        // Atmosphere: Subtle movement on mouse move for the background
+        document.addEventListener('mousemove', (e) => {
+            const amount = 20;
+            const x = (e.clientX / window.innerWidth - 0.5) * amount;
+            const y = (e.clientY / window.innerHeight - 0.5) * amount;
+            document.querySelector('div[style*="background-image"]').style.transform = `translate(${x}px, ${y}px)`;
+        });
+    </script>
+</body></html>
