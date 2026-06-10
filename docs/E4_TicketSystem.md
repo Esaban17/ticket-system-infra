@@ -16,6 +16,7 @@
 - [x] Modelo de datos (heredado)
 - [x] Diseño de red (heredado)
 - [x] Flujos asíncronos
+- [x] Frontend implementado (app/web) — mockups hi-fi, 8 features, E2E
 - [x] Preguntas abiertas
 - [x] Anexo IA
 
@@ -44,6 +45,10 @@ El endpoint `com.amazonaws.us-east-1.sqs` fue provisionado en E3 como parte del 
 ### Cambio 4 — Lambda pasa de placeholder a diseño completo
 
 El `index.py` actual termina con el comentario *"In Delivery 4 this function will be wired as the event source consumer for an SQS queue"*. E4 documenta la lógica completa del worker — los dos flujos que ejecutará, el payload que procesará, y cómo maneja fallos. El código real se implementa en D4 del curso de Automatización.
+
+### Cambio 5 — El frontend pasa de mockups a aplicación implementada
+
+E1 entregó 8 mockups low-fi; E4 entrega la **aplicación web real** (`app/web`) conectada al API, cubriendo los 8 casos de uso priorizados, con suite E2E. El detalle (stack, PRs #41–#49, desviaciones y verificación) está en §7.
 
 ### Sin cambios
 
@@ -331,7 +336,48 @@ El evaluador puede ser invocado dos veces en el mismo período si EventBridge re
 
 ---
 
-## 7. Preguntas abiertas
+## 7. Frontend implementado (app/web)
+
+E4 entrega también el **frontend completo del sistema**, conectado al API real de D3/D4 (NestJS + Prisma + RDS). El proceso siguió el flujo diseño → implementación → verificación: los wireframes low-fi de E1 se elevaron a **mockups hi-fi con el MCP de Stitch** ([`docs/mockups/hifi/`](mockups/hifi/README.md), proyecto Stitch `9105126066909741175`), y a partir de ellos se implementaron las 8 pantallas como aplicación real.
+
+### 7.1 Stack y estructura
+
+- **Vite + React 18 + TypeScript estricto + Tailwind CSS 3.4** en `app/web`, servida en desarrollo en `:5173`.
+- **API client tipado** (`src/api/`) que cubre el contrato completo: cursor pagination, `Idempotency-Key` en creación, `expectedVersion` (optimistic locking) en asignación/cambio de estado, errores Problem Details (RFC 9457).
+- **Sesión y RBAC en UI** (`src/auth/`): guards de ruta por rol; reportante no ve acciones de agente ni navegación de admin.
+- **CI propio**: `.github/workflows/app-web-ci.yml` (lint + tsc + build en PRs que tocan `app/web/**`).
+
+### 7.2 PRs de la entrega (rama por feature, base `main`, CI verde antes de cada merge)
+
+| PR | Alcance | Casos de uso |
+|---|---|---|
+| #41 | FE-01 — Scaffold: API client tipado, AuthContext, layout, rutas, CI | transversal |
+| #42 | FE-02 — Autenticación: `POST /v1/auth/login` + `GET /v1/auth/me` en el API (JWT mock hasta Cognito/EP-14) + página de login | RBAC §4.7 |
+| #43 | FE-03 — Cola de tickets: filtros del API, búsqueda, SLA restante con countdown, "Asignarme" | CU-02, CU-06 |
+| #44 | FE-05 — Detalle + resolución (state machine por rol/assignee, causa raíz y solución obligatorias) + historial con export CSV | CU-03, CU-05 |
+| #45 | FE-04 — Crear ticket (incidente/solicitud, prioridad calculada en vivo, adjuntos S3 con degradación) + **fix API**: `Idempotency-Key` faltaba en CORS `allowedHeaders` | CU-01, CU-08 |
+| #46 | FE-06 — Escalados SLA (KPIs L1–L3) + Reportes admin con descarga CSV autenticada | CU-04, CU-07 |
+| #47 | **Fix API**: la cola ordenaba Crítica al final (el enum Postgres `ticket_priority` declara `critica` primero, por lo que `desc` invertía la priorización de CU-02) | CU-02 |
+| #48 | FE-07 — Suite E2E Playwright (`app/web/e2e/`): autenticación, generación, asignación y resolución contra el stack real | 4 casos núcleo |
+| #49 | FE-08 — Mockups hi-fi de Stitch commiteados como documentación | — |
+
+### 7.3 Desviaciones de los mockups (el contrato del API manda)
+
+- Sin filtro por tipo/categoría en la cola: el API no expone esos query params.
+- Única asignación posible es "Asignarme": no existe endpoint de listado de usuarios.
+- El formulario de creación omite categoría/servicio afectado (el `ValidationPipe` global rechaza campos extra) y la "fecha deseada" de solicitudes se embebe en la descripción.
+- El export CSV del historial se genera client-side; el CSV de reportes (`/v1/reports/tickets.csv`) es exclusivo del rol administrador y se descarga vía `fetch` autenticado + Blob.
+
+### 7.4 Verificación E2E
+
+Doble verificación de los cuatro casos de uso núcleo contra el stack local real (Postgres + API + frontend, sin mocks):
+
+1. **Interactiva con el MCP de Playwright**: login inválido (401 Problem Details visible) y válido, RBAC en UI por rol, creación de incidente crítico (prioridad calculada por el backend, SLA 1h), asignación desde la cola, inicio de trabajo y resolución con causa raíz/solución — el ticket de prueba avanzó `version` 0→3 por optimistic locking y su historial registró los 4 eventos del ciclo de vida.
+2. **Suite automatizada** (`npm run test:e2e` en `app/web`): 4 tests en serie, `4 passed`.
+
+---
+
+## 8. Preguntas abiertas
 
 E4 cierra las 4 preguntas de Asíncrono que venían de E2 y E3. Solo quedan abiertas las de E5.
 
@@ -358,7 +404,15 @@ E4 cierra las 4 preguntas de Asíncrono que venían de E2 y E3. Solo quedan abie
 
 ---
 
-## 8. Anexo IA
+## 9. Anexo IA
+
+### IA en el frontend (PRs #41–#49)
+
+- **Mockups hi-fi generados con el MCP de Stitch** (Google) a partir de los wireframes low-fi de E1, con un design system propio ("SRE/Ops Precision": Inter, acento indigo-600, paleta slate, colores semánticos de severidad). Editables en el proyecto Stitch `9105126066909741175`.
+- **Implementación orquestada con Claude Code** usando workflows multi-agente: un agente implementador por feature (en worktrees git aislados para desarrollar en paralelo) más un agente verificador adversarial por PR, que probaba contra el stack local real antes del merge.
+- **La verificación adversarial encontró dos bugs reales del API** que el desarrollo por curl no detectaba: el preflight CORS rechazaba el header `Idempotency-Key` (toda creación de tickets fallaba desde navegador — fix en #45) y el `orderBy: desc` sobre el enum de prioridad invertía la cola (fix en #47).
+- **E2E con el MCP de Playwright**: los 4 casos de uso núcleo se verificaron primero de forma interactiva en navegador real y después se codificaron como suite permanente (#48).
+- El equipo fijó las restricciones que la IA debía respetar: contrato del API sobre los mockups, un PR por feature con base `main` (lección de los PRs apilados de D4), commits Conventional Commits en español y verificación local antes de cada merge.
 
 ### Qué le pedimos a la IA en E4
 - Borrador de la distinción evento vs comando aplicada al dominio concreto de tickets.
