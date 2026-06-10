@@ -38,3 +38,15 @@ npm run dev            # http://localhost:5173
 - `src/components/layout/` — app shell (sidebar con navegación por rol + topbar).
 - `src/components/ui/` — Badge (prioridad/severidad/estado), Button, Card, Table densa, Spinner, EmptyState, ErrorBanner.
 - `src/pages/<feature>/` — una carpeta por feature (login, queue, create, detail, sla, reports).
+
+## Tests E2E (Playwright)
+
+La suite (`e2e/flujo-tickets.spec.ts`) cubre los 4 casos de uso núcleo contra el stack local real: autenticación (+RBAC), creación de incidente, asignación y resolución con historial.
+
+```bash
+# Prerrequisitos: API en :8080 con Postgres migrado y seeds (ver app/api/README.md)
+npx playwright install chromium   # primera vez
+npm run test:e2e
+```
+
+El dev server de Vite se levanta automáticamente si no está corriendo (puerto 5173).
