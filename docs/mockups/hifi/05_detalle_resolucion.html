@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SRE Ops Console - Detalle de Ticket TKT-1042</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed-dim": "#ffb695",
+                    "surface-container-low": "#f2f3ff",
+                    "on-primary-container": "#dad7ff",
+                    "surface-container": "#eaedff",
+                    "inverse-primary": "#c3c0ff",
+                    "surface-tint": "#4d44e3",
+                    "secondary-fixed-dim": "#c2c6d3",
+                    "on-tertiary-fixed-variant": "#7b2f00",
+                    "surface-dim": "#d2d9f4",
+                    "surface-container-highest": "#dae2fd",
+                    "secondary": "#5a5e69",
+                    "on-surface-variant": "#464555",
+                    "error-container": "#ffdad6",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-container": "#60646f",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary-fixed": "#171c25",
+                    "outline-variant": "#c7c4d8",
+                    "on-secondary": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "on-tertiary-container": "#ffd2be",
+                    "secondary-fixed": "#dee2ef",
+                    "inverse-surface": "#283044",
+                    "surface-variant": "#dae2fd",
+                    "tertiary": "#7e3000",
+                    "surface": "#faf8ff",
+                    "primary-fixed": "#e2dfff",
+                    "primary-container": "#4f46e5",
+                    "inverse-on-surface": "#eef0ff",
+                    "primary": "#3525cd",
+                    "on-primary-fixed-variant": "#3323cc",
+                    "surface-bright": "#faf8ff",
+                    "on-secondary-fixed-variant": "#424751",
+                    "on-error": "#ffffff",
+                    "on-background": "#131b2e",
+                    "surface-container-high": "#e2e7ff",
+                    "background": "#faf8ff",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "on-surface": "#131b2e",
+                    "tertiary-container": "#a44100",
+                    "on-primary-fixed": "#0f0069",
+                    "outline": "#777587",
+                    "on-primary": "#ffffff",
+                    "error": "#ba1a1a",
+                    "tertiary-fixed": "#ffdbcc",
+                    "secondary-container": "#dee2ef",
+                    "on-tertiary-fixed": "#351000"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "md": "16px",
+                    "lg": "24px",
+                    "gutter": "16px",
+                    "base": "4px",
+                    "xl": "32px",
+                    "xs": "4px",
+                    "sm": "8px",
+                    "container-max": "1440px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-sm": ["Inter"],
+                    "code-sm": ["JetBrains Mono"],
+                    "body-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "code-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .ticket-card { border: 1px solid #e2e8f0; background: #ffffff; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- TopNavBar Cluster -->
+<header class="flex justify-between items-center w-full px-md sticky top-0 z-50 bg-surface dark:bg-surface-dim docked full-width h-[64px] border-b border-outline-variant dark:border-outline">
+<div class="flex items-center gap-md">
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface dark:text-inverse-on-surface">SRE/Ops Tickets</span>
+<div class="hidden md:flex ml-lg gap-md h-full items-center">
+<div class="px-sm py-xs cursor-pointer hover:bg-surface-container-low transition-colors text-on-surface-variant font-label-md text-label-md">Dashboard</div>
+<div class="px-sm py-xs cursor-pointer hover:bg-surface-container-low transition-colors text-primary dark:text-primary-fixed-dim border-b-2 border-primary font-label-md text-label-md">Tickets</div>
+<div class="px-sm py-xs cursor-pointer hover:bg-surface-container-low transition-colors text-on-surface-variant font-label-md text-label-md">Infraestructura</div>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<div class="flex items-center bg-surface-container-low px-sm py-xs rounded-lg border border-outline-variant">
+<span class="material-symbols-outlined text-outline">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-sm w-48" placeholder="Buscar ticket..." type="text"/>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary" data-icon="help">help</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary" data-icon="notifications">notifications</span>
+<img alt="User profile" class="w-8 h-8 rounded-full border border-outline" data-alt="A professional headshot of a middle-aged male IT professional in a corporate setting. He wears a clean white shirt and has a focused, reliable expression. The lighting is bright and even, characteristic of a high-end modern office environment. The background is a slightly blurred tech-centric workspace with subtle blue and grey accents." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGhEpfG6yEc4-WAGjDaz8m_DQBTjEx87u-_SVTdZnmxCb1LJjvDCkiNis_jJoXHTjt0MPW_aWttslYq7s6xXTVk4Lh-W8sgVy3M_lT5EMt9eHRfIOihp_67Wp4BHRinvILCT5m-SYdGXmmjWENkLDq6uuIVzAbhusF2ZZk0W_TzZmnHYB2ICY5wfmPBDJcoiq2caIBw0ITBUqcmwUcYNOBP5_Vmoas2nUOjvDYWYz3P6vD0GgHOtRIzF7wx8DrEoUWyKQqr0nODNQ"/>
+</div>
+</header>
+<div class="flex min-h-[calc(100vh-64px)]">
+<!-- SideNavBar Cluster -->
+<aside class="fixed left-0 top-[64px] h-[calc(100vh-64px)] w-[256px] bg-surface-container-lowest dark:bg-inverse-surface border-r border-outline-variant dark:border-outline py-md px-sm flex flex-col gap-sm">
+<div class="px-md mb-md">
+<p class="font-label-md text-label-md font-bold text-primary">SRE Ops Console</p>
+<p class="text-[10px] text-secondary-fixed-dim tracking-wider uppercase">Global Operations Center</p>
+</div>
+<nav class="flex flex-col gap-xs">
+<div class="flex items-center gap-md px-md py-sm rounded-lg text-secondary hover:bg-secondary-container/50 transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</div>
+<div class="flex items-center gap-md px-md py-sm rounded-lg text-primary bg-primary-container/10 font-bold transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="list_alt">list_alt</span>
+<span class="font-label-md text-label-md">Ticket Queue</span>
+</div>
+<div class="flex items-center gap-md px-md py-sm rounded-lg text-secondary hover:bg-secondary-container/50 transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="person_check">person_check</span>
+<span class="font-label-md text-label-md">Assigned</span>
+</div>
+<div class="flex items-center gap-md px-md py-sm rounded-lg text-secondary hover:bg-secondary-container/50 transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="task_alt">task_alt</span>
+<span class="font-label-md text-label-md">Closed</span>
+</div>
+<div class="flex items-center gap-md px-md py-sm rounded-lg text-secondary hover:bg-secondary-container/50 transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="assessment">assessment</span>
+<span class="font-label-md text-label-md">Reports</span>
+</div>
+<div class="flex items-center gap-md px-md py-sm rounded-lg text-secondary hover:bg-secondary-container/50 transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">Configuration</span>
+</div>
+</nav>
+<div class="mt-auto p-md bg-surface-container rounded-lg">
+<div class="flex items-center gap-sm mb-xs">
+<span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+<span class="font-label-md text-label-md text-on-surface">API Gateway: Online</span>
+</div>
+<div class="text-[10px] text-secondary">Latencia: 42ms</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-[256px] flex-1 p-lg max-w-[1200px]">
+<!-- Breadcrumb -->
+<nav class="flex items-center gap-xs text-secondary mb-md font-label-md text-label-md">
+<span class="hover:text-primary cursor-pointer">Cola de tickets</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="text-on-surface font-bold">TKT-1042</span>
+</nav>
+<!-- Ticket Header -->
+<div class="flex flex-col md:flex-row justify-between items-start gap-md mb-xl">
+<div class="flex-1">
+<h1 class="font-headline-md text-headline-md mb-sm">TKT-1042 — API de pagos retorna 500 en checkout</h1>
+<div class="flex flex-wrap items-center gap-sm mb-sm">
+<span class="bg-surface-container-high text-on-surface px-sm py-1 rounded-full text-xs font-bold border border-outline-variant">Incidente</span>
+<span class="bg-red-50 text-error px-sm py-1 rounded-full text-xs font-bold border border-error/20">Severidad: Crítica</span>
+<span class="bg-tertiary-fixed text-on-tertiary-fixed px-sm py-1 rounded-full text-xs font-bold">Prioridad: P1</span>
+<span class="bg-primary-container text-on-primary px-sm py-1 rounded-full text-xs font-bold">Estado: En progreso</span>
+</div>
+<div class="text-body-sm text-secondary flex gap-md">
+<span><strong>Asignado:</strong> Luis SRE</span>
+<span><strong>Reportado por:</strong> María Dev</span>
+<span class="text-green-600 font-semibold"><strong>SLA primera respuesta:</strong> cumplido (00:08)</span>
+</div>
+</div>
+<div class="flex gap-sm shrink-0">
+<button class="px-md py-sm bg-white border border-outline-variant text-on-surface font-label-md text-label-md rounded hover:bg-surface-container-low transition-colors">Asignar a otro</button>
+<button class="px-md py-sm bg-white border border-outline-variant text-on-surface font-label-md text-label-md rounded hover:bg-surface-container-low transition-colors">Comentar</button>
+<button class="px-md py-sm bg-primary text-white font-label-md text-label-md rounded shadow-sm active:scale-95 transition-transform">Cambiar estado</button>
+</div>
+</div>
+<!-- Tabs -->
+<div class="flex gap-lg border-b border-outline-variant mb-lg">
+<button class="pb-sm border-b-2 border-primary text-primary font-label-md text-label-md">Detalle</button>
+<button class="pb-sm text-secondary font-label-md text-label-md hover:text-on-surface">Historial</button>
+<button class="pb-sm text-secondary font-label-md text-label-md hover:text-on-surface">Adjuntos (3)</button>
+</div>
+<div class="grid grid-cols-12 gap-lg">
+<!-- Left Column -->
+<div class="col-span-12 lg:col-span-8 flex flex-col gap-lg">
+<!-- Description Card -->
+<section class="ticket-card p-lg rounded-lg">
+<div class="flex items-center gap-sm mb-md border-b border-surface-container pb-sm">
+<span class="material-symbols-outlined text-primary">description</span>
+<h2 class="font-headline-sm text-headline-sm">Descripción del reporte</h2>
+</div>
+<div class="text-body-md text-on-surface space-y-md">
+<p>Se han detectado errores HTTP 500 consistentes durante el proceso de checkout. Los logs de aplicación muestran fallos intermitentes en la validación de transacciones.</p>
+<div class="bg-surface-container-lowest border border-outline-variant p-md rounded mono text-code-sm">
+<span class="text-red-600">ERROR [2023-10-27 14:22:15]</span> Database Timeout: Request to /pay/confirm timed out after 5000ms<br/>
+<span class="text-secondary"># Datadog Trace ID: dd-8239102-p01</span><br/>
+<span class="text-secondary"># Host: k8s-node-p-104</span>
+</div>
+<div class="bg-error-container/20 border-l-4 border-error p-md rounded">
+<p class="text-error font-bold flex items-center gap-sm">
+<span class="material-symbols-outlined">warning</span>
+                                    Impacto: 45% de las transacciones fallidas en los últimos 15 minutos.
+                                </p>
+</div>
+</div>
+</section>
+<!-- Change Status Card -->
+<section class="ticket-card p-lg rounded-lg border-primary/20">
+<div class="flex items-center gap-sm mb-md border-b border-surface-container pb-sm">
+<span class="material-symbols-outlined text-primary">sync_alt</span>
+<h2 class="font-headline-sm text-headline-sm">Cambiar estado / Resolución</h2>
+</div>
+<div class="space-y-lg">
+<div>
+<label class="block font-label-md text-label-md text-secondary mb-xs">Cambiar a:</label>
+<select class="w-full border-outline-variant rounded p-sm bg-white focus:ring-primary focus:border-primary text-body-md">
+<option>Abierto</option>
+<option>En progreso</option>
+<option selected="">Resuelto</option>
+<option>Cerrado</option>
+</select>
+</div>
+<div class="bg-surface-container-high p-md rounded flex items-start gap-sm">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">info</span>
+<p class="text-body-sm text-on-surface-variant">Al pasar a <strong>Resuelto</strong> estos campos son requeridos para el post-mortem y documentación técnica.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<div>
+<label class="block font-label-md text-label-md text-secondary mb-xs">Causa raíz (requerido)*</label>
+<textarea class="w-full border-outline-variant rounded p-sm bg-white focus:ring-primary focus:border-primary text-body-md h-24" placeholder="Ej: Agotamiento de pool de conexiones..."></textarea>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-secondary mb-xs">Solución aplicada (requerido)*</label>
+<textarea class="w-full border-outline-variant rounded p-sm bg-white focus:ring-primary focus:border-primary text-body-md h-24" placeholder="Ej: Incremento de max_connections en RDS..."></textarea>
+</div>
+</div>
+<div class="flex items-center gap-sm">
+<input checked="" class="rounded text-primary focus:ring-primary border-outline-variant" id="notify" type="checkbox"/>
+<label class="text-body-md" for="notify">Notificar al reportante (María Dev)</label>
+</div>
+<div class="flex justify-end gap-md">
+<button class="px-lg py-sm border border-outline-variant rounded font-label-md text-label-md hover:bg-surface-container-low">Cancelar</button>
+<button class="px-lg py-sm bg-primary text-white rounded font-label-md text-label-md shadow active:opacity-80 transition-opacity">Confirmar cambio de estado</button>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column (Sidebar) -->
+<div class="col-span-12 lg:col-span-4 flex flex-col gap-lg">
+<!-- Metadata Card -->
+<section class="ticket-card p-md rounded-lg">
+<h3 class="font-label-md text-label-md text-secondary uppercase mb-md tracking-wider">Metadatos del ticket</h3>
+<div class="space-y-sm text-body-sm">
+<div class="flex justify-between py-1 border-b border-surface-container">
+<span class="text-secondary">Tipo:</span>
+<span class="font-bold">Incidente</span>
+</div>
+<div class="flex justify-between py-1 border-b border-surface-container">
+<span class="text-secondary">Severidad:</span>
+<span class="text-error font-bold">Crítica</span>
+</div>
+<div class="flex justify-between py-1 border-b border-surface-container">
+<span class="text-secondary">Prioridad:</span>
+<span class="text-tertiary font-bold">P1</span>
+</div>
+<div class="flex justify-between py-1 border-b border-surface-container items-center">
+<span class="text-secondary">SLA Resolución:</span>
+<span class="mono bg-surface-container px-1 rounded text-red-600 font-bold">4h (faltan 3h 22m)</span>
+</div>
+<div class="flex justify-between py-1 border-b border-surface-container">
+<span class="text-secondary">Escalamiento:</span>
+<span class="font-semibold">L1 Engineer</span>
+</div>
+<div class="flex justify-between py-1">
+<span class="text-secondary">Notificaciones:</span>
+<span class="flex gap-xs items-center">
+<span class="material-symbols-outlined text-[16px]">mail</span>
+<span class="material-symbols-outlined text-[16px]">chat_bubble</span>
+</span>
+</div>
+</div>
+</section>
+<!-- People Card -->
+<section class="ticket-card p-md rounded-lg">
+<h3 class="font-label-md text-label-md text-secondary uppercase mb-md tracking-wider">Personas</h3>
+<div class="space-y-md">
+<div class="flex items-center gap-md">
+<img alt="Reporter" class="w-10 h-10 rounded-full border" data-alt="A portrait of a young female software developer with glasses, smiling confidently in a modern tech office environment. She has a professional yet approachable look, with colorful tech equipment visible in the softly blurred background. The style is clean, corporate photography with high-quality natural lighting and a professional finish." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZpAU49WtlRrM9uyiAuUOGjSU24Is01wWGDhugiUnz_JtYaVxcx9pwMC_76pY9INJbPeccEgjJoEMV7xsWeq_Pv8FWqMqnD38U-e8aOSsgCvlC--z-j8JdffJhtzYJlv-EqohOOgRfEJ2KJ6JjnyYgQpdUuNQDxqfhOhg2FAUf8e6PDSdhptg6ml0ZXFuzk0fynQbkLcXhYS77RjC_kZ2ZdbCUu3SILYkT8nhI-G0z7warSzwCnFyOKRTfXx3VC0xwKohwfSiXFjA"/>
+<div>
+<p class="font-bold text-body-md">María Dev</p>
+<p class="text-xs text-secondary">Reportante · Team Payments</p>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<img alt="Assignee" class="w-10 h-10 rounded-full border" data-alt="A high-resolution portrait of a male SRE engineer in his late 20s, looking focused and capable. He wears a casual navy blue tech-branded t-shirt. The background is a sophisticated workspace with subtle monitor glows and minimalist furniture, conveying a sense of expertise and technical reliability." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYLixtFTw0XUatI5_q2fsk_mggXIp9Z4rfsmMMGB8O-E74aXAbJnxt64iU22Ei_XX3xSNEmY3t0ooZPQoshlKofj18WPQCGViUip9m0vTvzxOoIlU-zkUtywYta11oSulcFnOb8kRache7NuV7rbM_cB94_D3reJ2jCfWXAUai8fbovvtFwIh6V0a6iyIecm2WhAAGglSYbB68Xl4Ux-Gpk4LG12lA13fj3OdaatpXygwThyetiGclKbONERRxFQatusGxx5Oyafw"/>
+<div>
+<p class="font-bold text-body-md">Luis SRE</p>
+<p class="text-xs text-secondary">Agente · Team Core SRE</p>
+</div>
+</div>
+<a class="block text-center text-primary font-label-md text-label-md mt-md hover:underline decoration-2" href="#">Reasignar</a>
+</div>
+</section>
+<!-- Related Links -->
+<section class="ticket-card p-md rounded-lg">
+<h3 class="font-label-md text-label-md text-secondary uppercase mb-md tracking-wider">Enlaces relacionados</h3>
+<div class="space-y-sm">
+<a class="flex items-center gap-sm p-sm hover:bg-surface-container-low rounded group" href="#">
+<span class="material-symbols-outlined text-secondary group-hover:text-primary">monitoring</span>
+<span class="text-body-sm text-on-surface">Dashboard de Grafana</span>
+<span class="material-symbols-outlined text-[14px] ml-auto text-outline">open_in_new</span>
+</a>
+<a class="flex items-center gap-sm p-sm hover:bg-surface-container-low rounded group" href="#">
+<span class="material-symbols-outlined text-secondary group-hover:text-primary">book_5</span>
+<span class="text-body-sm text-on-surface">Runbook: DB-Conn-Pool</span>
+<span class="material-symbols-outlined text-[14px] ml-auto text-outline">open_in_new</span>
+</a>
+</div>
+</section>
+</div>
+</div>
+</main>
+</div>
+<!-- Micro-interaction JS -->
+<script>
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', function() {
+                if(this.classList.contains('active:scale-95')) {
+                    // Small ripple or interaction feedback could go here
+                }
+            });
+        });
+
+        // Simple toggle logic simulation for select
+        const statusSelect = document.querySelector('select');
+        statusSelect.addEventListener('change', (e) => {
+            console.log('Status change requested to:', e.target.value);
+        });
+    </script>
+</body></html>

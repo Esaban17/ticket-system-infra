@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Crear nuevo ticket — SRE/Ops Ticketing</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            DEFAULT: '#4f46e5',
+                            foreground: '#ffffff'
+                        }
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter", "sans-serif"],
+                        "display": ["Inter", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .severity-card:has(input:checked) {
+            border-color: #4f46e5;
+            background-color: #f5f3ff;
+            ring: 1px solid #4f46e5;
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 h-16 font-body text-sm">
+<div class="flex items-center gap-4">
+<img alt="SRE/Ops Logo" class="h-8 w-auto" src="https://lh3.googleusercontent.com/aida/AP1WRLtizEhJjTY8wKGDJ2OwNbjPXMniAdA08KiaBqbTsa-MdzPR71ljsoNo7YSYCMnPFaAOm0OnX_7QLfD8SBslm2ECPHrltkZ01IHzNmIoiccOrUE0OQNTRRTWNls1y5Qyq2vxCCLAuvvyJjNA894xXINvx7eWq0xNiNjAvuxhIR9GS8Y9TNaKDBnf9OcFr-JQm_sdCvxtR_1y5w6EFNibXr6QROSQySFo3zyP2lgVMlfst9RziParsCDBgf0"/>
+<span class="text-xl font-headline font-bold text-slate-900 dark:text-white">SRE/Ops Ticketing</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-slate-400">search</span>
+<input class="pl-10 pr-4 py-1.5 bg-slate-100 border-none rounded-lg text-sm w-64 focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="Buscar tickets, servicios..." type="text"/>
+</div>
+<div class="flex items-center gap-4 text-slate-600 dark:text-slate-400">
+<button class="hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-lg transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<button class="hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-lg transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-lg transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
+                    OP
+                </div>
+</div>
+</div>
+</header>
+<!-- Sidebar -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-4 space-y-2 font-body text-sm font-medium z-40">
+<div class="mb-6 px-2">
+<p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Menú Principal</p>
+</div>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 ease-in-out rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+                Inicio
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 rounded-lg transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+                Nuevo ticket
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 ease-in-out rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="confirmation_number">confirmation_number</span>
+                Mis tickets
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 ease-in-out rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="bar_chart">bar_chart</span>
+                Reportes
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 ease-in-out rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+                Equipos
+            </a>
+</nav>
+<div class="absolute bottom-8 left-4 right-4">
+<button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg font-bold shadow-sm transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+                Crear Incidencia
+            </button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="ml-64 mt-16 p-8 pb-24 flex-grow overflow-y-auto">
+<div class="max-w-6xl mx-auto">
+<!-- Breadcrumb & Header -->
+<nav class="flex text-xs text-slate-500 mb-2 gap-2 items-center">
+<a class="hover:text-indigo-600" href="#">Inicio</a>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="font-medium text-slate-900">Nuevo ticket</span>
+</nav>
+<h1 class="text-3xl font-headline font-extrabold text-slate-900 mb-8 tracking-tight">Crear nuevo ticket</h1>
+<div class="grid grid-cols-12 gap-8">
+<!-- Left Column (Form) -->
+<div class="col-span-12 lg:col-span-8 space-y-8">
+<!-- Toggle Tabs -->
+<div class="flex p-1 bg-slate-200/50 rounded-xl w-fit">
+<button class="px-6 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold shadow-md transition-all">Incidente</button>
+<button class="px-6 py-2 text-slate-600 hover:text-indigo-600 rounded-lg text-sm font-medium transition-all">Solicitud de servicio</button>
+</div>
+<!-- Form Section -->
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
+<div class="space-y-2">
+<label class="block text-sm font-bold text-slate-700">Título *</label>
+<input class="w-full border-slate-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2.5" placeholder="Ej. API de pagos retorna 500 en checkout" type="text"/>
+</div>
+<div class="space-y-2">
+<label class="block text-sm font-bold text-slate-700">Descripción *</label>
+<textarea class="w-full border-slate-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm" placeholder="Describe qué ocurrió, pasos para reproducir, comportamiento esperado…" rows="6"></textarea>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="space-y-2">
+<label class="block text-sm font-bold text-slate-700">Categoría</label>
+<select class="w-full border-slate-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2.5">
+<option>Backend</option>
+<option>Infraestructura</option>
+<option>Base de datos</option>
+<option>Redes</option>
+<option>Frontend</option>
+</select>
+</div>
+<div class="space-y-2">
+<label class="block text-sm font-bold text-slate-700">Servicio afectado</label>
+<select class="w-full border-slate-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2.5">
+<option>API Pagos</option>
+<option>API Auth</option>
+<option>CDN</option>
+<option>DB Prod</option>
+</select>
+</div>
+</div>
+<!-- Severity Grid -->
+<div class="space-y-3">
+<label class="block text-sm font-bold text-slate-700">Severidad</label>
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+<!-- Critica -->
+<label class="relative flex flex-col p-4 border rounded-lg cursor-pointer transition-all border-red-500 bg-red-50/30 hover:bg-red-50">
+<input class="sr-only" name="severity" type="radio" value="critical"/>
+<span class="text-red-700 font-bold text-xs uppercase mb-1">Crítica</span>
+<span class="text-[11px] text-slate-600 leading-tight">Sistema caído, sin workaround.</span>
+</label>
+<!-- Alta -->
+<label class="relative flex flex-col p-4 border rounded-lg cursor-pointer transition-all border-indigo-600 bg-indigo-50">
+<input checked="" class="sr-only" name="severity" type="radio" value="high"/>
+<span class="text-indigo-700 font-bold text-xs uppercase mb-1">Alta</span>
+<span class="text-[11px] text-slate-600 leading-tight">Funcionalidad clave degradada.</span>
+<div class="absolute top-2 right-2">
+<span class="material-symbols-outlined text-indigo-600 text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</label>
+<!-- Media -->
+<label class="relative flex flex-col p-4 border rounded-lg cursor-pointer transition-all border-amber-400 hover:bg-amber-50">
+<input class="sr-only" name="severity" type="radio" value="medium"/>
+<span class="text-amber-700 font-bold text-xs uppercase mb-1">Media</span>
+<span class="text-[11px] text-slate-600 leading-tight">Bug con workaround aceptable.</span>
+</label>
+<!-- Baja -->
+<label class="relative flex flex-col p-4 border rounded-lg cursor-pointer transition-all border-slate-300 hover:bg-slate-50">
+<input class="sr-only" name="severity" type="radio" value="low"/>
+<span class="text-slate-700 font-bold text-xs uppercase mb-1">Baja</span>
+<span class="text-[11px] text-slate-600 leading-tight">Cosmético o mejora menor.</span>
+</label>
+</div>
+</div>
+<!-- Attachments -->
+<div class="space-y-2">
+<label class="block text-sm font-bold text-slate-700">Adjuntos</label>
+<div class="border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center bg-slate-50/50 hover:bg-slate-50 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-slate-400 group-hover:text-indigo-600 text-4xl mb-2 transition-colors" data-icon="upload_file">upload_file</span>
+<p class="text-sm text-slate-600 font-medium">Arrastra archivos o <span class="text-indigo-600 underline">selecciona localmente</span></p>
+<p class="text-xs text-slate-400 mt-1">Logs, capturas (PNG/JPG) hasta 25MB por archivo.</p>
+</div>
+<!-- File List -->
+<div class="mt-4 space-y-2">
+<div class="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400" data-icon="description">description</span>
+<div>
+<p class="text-sm font-medium text-slate-700">logs-api-pagos-2026-05-17.txt</p>
+<p class="text-[10px] text-slate-400">1.2 MB • Completo</p>
+</div>
+</div>
+<button class="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="delete">delete</span>
+                                        Eliminar
+                                    </button>
+</div>
+</div>
+</div>
+<!-- Notifications -->
+<div class="flex items-center gap-3 py-2">
+<input checked="" class="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" id="slack_notify" type="checkbox"/>
+<label class="text-sm text-slate-700" for="slack_notify">Notificarme por Slack además de email</label>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex items-center justify-end gap-4 pb-12">
+<button class="px-6 py-2.5 text-slate-600 hover:text-slate-900 font-bold transition-colors">Cancelar</button>
+<button class="px-10 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-lg shadow-indigo-200 transition-all flex items-center gap-2">
+                            Crear ticket
+                        </button>
+</div>
+</div>
+<!-- Right Column (Sidebar) -->
+<div class="col-span-12 lg:col-span-4 space-y-6">
+<!-- Info Card -->
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+<h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-indigo-600 text-xl" data-icon="info">info</span>
+                            ¿Qué pasa después?
+                        </h3>
+<ul class="space-y-4">
+<li class="flex gap-3">
+<span class="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 flex-shrink-0 mt-0.5">1</span>
+<p class="text-xs text-slate-600 leading-relaxed">Se asigna un número <span class="font-mono text-indigo-600 font-bold">TKT-XXXX</span> único para seguimiento.</p>
+</li>
+<li class="flex gap-3">
+<span class="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 flex-shrink-0 mt-0.5">2</span>
+<p class="text-xs text-slate-600 leading-relaxed">Tu ticket se prioriza automáticamente según la severidad seleccionada.</p>
+</li>
+<li class="flex gap-3">
+<span class="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 flex-shrink-0 mt-0.5">3</span>
+<p class="text-xs text-slate-600 leading-relaxed">Operaciones lo tomará dentro del SLA aplicable al nivel de servicio.</p>
+</li>
+<li class="flex gap-3">
+<span class="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 flex-shrink-0 mt-0.5">4</span>
+<p class="text-xs text-slate-600 leading-relaxed">Recibirás una notificación instantánea cuando un agente lo atienda.</p>
+</li>
+</ul>
+</div>
+<!-- SLA Alert -->
+<div class="bg-indigo-50 border border-indigo-100 rounded-xl p-5 flex gap-4">
+<div class="h-10 w-10 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-white" data-icon="timer">timer</span>
+</div>
+<div>
+<p class="text-xs font-bold text-indigo-900 mb-1">SLA Estimado</p>
+<p class="text-[13px] text-indigo-700">Para <span class="font-bold">Incidente / Alta</span>:</p>
+<p class="text-xl font-headline font-black text-indigo-900 mt-1">1 hora</p>
+</div>
+</div>
+<!-- Status Indicator Widget -->
+<div class="bg-slate-900 rounded-xl p-6 text-white overflow-hidden relative group">
+<div class="absolute top-0 right-0 p-4 opacity-20 transform translate-x-4 -translate-y-4 group-hover:translate-x-2 group-hover:-translate-y-2 transition-transform">
+<span class="material-symbols-outlined text-8xl" data-icon="dns">dns</span>
+</div>
+<p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-4">Estado Global Infra</p>
+<div class="flex items-center gap-2 mb-2">
+<div class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
+<span class="text-sm font-medium">Sistemas Operativos</span>
+</div>
+<p class="text-[11px] text-slate-400 leading-relaxed">Todos los servicios críticos están operando con latencia normal (&lt; 50ms).</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="fixed bottom-0 left-64 right-0 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 z-40">
+<div class="w-full py-4 px-8 flex justify-between items-center font-body text-xs">
+<p class="text-slate-500 dark:text-slate-400 font-medium">© 2026 SRE/Ops System - <span class="text-indigo-600 font-bold">Confidencial</span></p>
+<div class="flex gap-6">
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-colors duration-150" href="#">Términos</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-colors duration-150" href="#">Privacidad</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-colors duration-150" href="#">Soporte</a>
+</div>
+</div>
+</footer>
+<script>
+        // Micro-interactions for severity cards
+        const severityInputs = document.querySelectorAll('input[name="severity"]');
+        severityInputs.forEach(input => {
+            input.addEventListener('change', (e) => {
+                // Remove check icons and reset styles
+                document.querySelectorAll('.severity-card-icon').forEach(icon => icon.remove());
+                document.querySelectorAll('input[name="severity"]').forEach(inp => {
+                    const parent = inp.closest('label');
+                    parent.style.ring = 'none';
+                });
+                
+                // Add active state if needed (most handled by Tailwind)
+                if(e.target.checked) {
+                    const parent = e.target.closest('label');
+                    const icon = document.createElement('div');
+                    icon.className = 'absolute top-2 right-2 severity-card-icon';
+                    icon.innerHTML = '<span class="material-symbols-outlined text-indigo-600 text-lg" style="font-variation-settings: \'FILL\' 1;">check_circle</span>';
+                    // We don't really need to append if we use the CSS :has logic above, but for redundancy:
+                    // parent.appendChild(icon);
+                }
+            });
+        });
+
+        // Simple Drag and Drop highlight effect
+        const dropzone = document.querySelector('.group');
+        if(dropzone) {
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropzone.classList.add('bg-indigo-50', 'border-indigo-400');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropzone.classList.remove('bg-indigo-50', 'border-indigo-400');
+                }, false);
+            });
+        }
+    </script>
+</body></html>

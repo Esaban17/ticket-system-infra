@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Historial de Ticket | SRE Ops Console</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed-variant": "#7b2f00",
+                    "on-secondary-fixed-variant": "#424751",
+                    "background": "#faf8ff",
+                    "inverse-primary": "#c3c0ff",
+                    "outline": "#777587",
+                    "surface": "#faf8ff",
+                    "on-tertiary": "#ffffff",
+                    "secondary-container": "#dee2ef",
+                    "error-container": "#ffdad6",
+                    "inverse-surface": "#283044",
+                    "error": "#ba1a1a",
+                    "on-tertiary-container": "#ffd2be",
+                    "tertiary-container": "#a44100",
+                    "secondary": "#5a5e69",
+                    "on-error-container": "#93000a",
+                    "on-surface-variant": "#464555",
+                    "on-primary-fixed-variant": "#3323cc",
+                    "on-secondary-fixed": "#171c25",
+                    "secondary-fixed": "#dee2ef",
+                    "inverse-on-surface": "#eef0ff",
+                    "primary-container": "#4f46e5",
+                    "on-primary-fixed": "#0f0069",
+                    "surface-variant": "#dae2fd",
+                    "on-secondary": "#ffffff",
+                    "on-error": "#ffffff",
+                    "tertiary": "#7e3000",
+                    "primary": "#3525cd",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container": "#eaedff",
+                    "on-secondary-container": "#60646f",
+                    "surface-dim": "#d2d9f4",
+                    "secondary-fixed-dim": "#c2c6d3",
+                    "surface-bright": "#faf8ff",
+                    "surface-container-low": "#f2f3ff",
+                    "surface-container-highest": "#dae2fd",
+                    "tertiary-fixed-dim": "#ffb695",
+                    "on-tertiary-fixed": "#351000",
+                    "surface-container-high": "#e2e7ff",
+                    "outline-variant": "#c7c4d8",
+                    "on-primary-container": "#dad7ff",
+                    "on-background": "#131b2e",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "on-primary": "#ffffff",
+                    "surface-tint": "#4d44e3",
+                    "primary-fixed": "#e2dfff",
+                    "tertiary-fixed": "#ffdbcc",
+                    "on-surface": "#131b2e"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "xs": "4px",
+                    "container-max": "1440px",
+                    "lg": "24px",
+                    "md": "16px",
+                    "gutter": "16px",
+                    "sm": "8px",
+                    "base": "4px",
+                    "xl": "32px"
+            },
+            "fontFamily": {
+                    "headline-sm": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "code-sm": ["JetBrains Mono"]
+            },
+            "fontSize": {
+                    "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "code-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      .timeline-dot::after {
+        content: '';
+        position: absolute;
+        top: 24px;
+        bottom: -16px;
+        left: 11px;
+        width: 1px;
+        background-color: theme('colors.outline-variant');
+      }
+      .timeline-item:last-child .timeline-dot::after {
+        display: none;
+      }
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md selection:bg-primary-container selection:text-on-primary-container">
+<!-- Shell Container -->
+<div class="flex h-screen overflow-hidden">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-[256px] flex flex-col py-md px-sm border-r bg-surface-container-lowest dark:bg-inverse-surface border-outline-variant dark:border-outline z-50">
+<div class="px-md mb-xl">
+<div class="font-headline-sm text-headline-sm font-bold text-primary mb-xs">SRE Ops Console</div>
+<div class="font-body-sm text-body-sm text-secondary">Global Operations Center</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-secondary dark:text-secondary-fixed-dim hover:bg-secondary-container/50 transition-all duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</a>
+<!-- Active Item: Cola de tickets (Ticket Queue) -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-primary dark:text-primary-fixed-dim bg-primary-container/10 dark:bg-primary-container/20 font-bold transition-all duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">list_alt</span>
+<span class="font-label-md text-label-md">Cola de tickets</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-secondary dark:text-secondary-fixed-dim hover:bg-secondary-container/50 transition-all duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">person_check</span>
+<span class="font-label-md text-label-md">Assigned</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-secondary dark:text-secondary-fixed-dim hover:bg-secondary-container/50 transition-all duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">task_alt</span>
+<span class="font-label-md text-label-md">Closed</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-secondary dark:text-secondary-fixed-dim hover:bg-secondary-container/50 transition-all duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">assessment</span>
+<span class="font-label-md text-label-md">Reports</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-secondary dark:text-secondary-fixed-dim hover:bg-secondary-container/50 transition-all duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Configuration</span>
+</a>
+</nav>
+<div class="mt-auto px-md py-md border-t border-outline-variant flex items-center gap-md">
+<img alt="System Operator" class="w-10 h-10 rounded-full object-cover" data-alt="A professional portrait of a tech-focused person in a clean, modern studio setting. The lighting is soft and even, suggesting a workspace environment. The overall aesthetic is clean, professional, and reliable, utilizing a high-key light mode palette with subtle indigo and slate tones consistent with an enterprise software developer profile." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdfoJ6gZ-gJVtjexhImN20iu8Tqc8dKSSB16TjGHq1rvXfiDY12adVI6K3VMkHIGNEcEaKw2U-wJ12cpkQQ-d_AJ77mn6e_ua2rEBspJwo5mCIHxtZX0G7TA5P7fVISq1mJZR6fEF_O-JFM6shhd6yEn8pqWypJ1Nj2fHDeq9DjZOUQVRt_M60B1o0qAQkKdfqXdEFBt8oCWD7duY926GHthDu_eU3LhA2mlcut0hKg-ry6Uj8XE-XPjry2vsLZjr_a0YWpASmbvo"/>
+<div>
+<div class="font-label-md text-label-md">Luis SRE</div>
+<div class="text-[10px] text-secondary uppercase tracking-widest">Level 3 Ops</div>
+</div>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="flex-1 flex flex-col ml-[256px] overflow-hidden">
+<!-- TopNavBar -->
+<header class="flex justify-between items-center w-full px-md sticky top-0 z-50 bg-surface dark:bg-surface-dim docked full-width top-0 h-[64px] border-b border-outline-variant dark:border-outline">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-primary">confirmation_number</span>
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface dark:text-inverse-on-surface">SRE/Ops Tickets</span>
+</div>
+<div class="flex-1 max-w-md mx-xl">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-md text-outline">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-full pl-[48px] pr-md py-xs text-body-sm focus:ring-2 focus:ring-primary/20 transition-all" placeholder="Buscar por ID, usuario o componente..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="p-xs rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">help</span>
+</button>
+<button class="p-xs rounded-full hover:bg-surface-container-low transition-colors relative">
+<span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+<span class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-bold text-xs">
+                        L
+                    </div>
+</div>
+</header>
+<!-- Content Area -->
+<div class="flex-1 overflow-y-auto p-lg bg-surface-container-lowest">
+<div class="max-w-[1200px] mx-auto">
+<!-- Breadcrumb & Header -->
+<div class="mb-lg">
+<nav class="flex items-center gap-xs text-on-surface-variant font-label-md text-label-md mb-sm">
+<span>Cola de tickets</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-primary">TKT-1042</span>
+</nav>
+<div class="flex flex-wrap items-center justify-between gap-md mb-md">
+<div class="flex flex-col gap-xs">
+<h1 class="font-headline-md text-headline-md text-on-surface tracking-tight">
+                                    TKT-1042 — API de pagos retorna 500 en checkout
+                                </h1>
+<div class="flex items-center gap-sm">
+<span class="px-sm py-1 bg-secondary-container text-on-secondary-container rounded-lg font-label-md text-label-md">Incidente</span>
+<span class="px-sm py-1 bg-error-container text-on-error-container border border-error/20 rounded-lg font-label-md text-label-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">priority_high</span> P1
+                                    </span>
+<span class="px-sm py-1 bg-primary-container/10 text-primary rounded-lg font-label-md text-label-md">En progreso</span>
+</div>
+</div>
+<button class="bg-primary text-on-primary px-lg py-sm rounded-lg font-label-md text-label-md hover:opacity-90 transition-opacity flex items-center gap-sm">
+<span class="material-symbols-outlined text-[18px]">bolt</span> Acción Rápida
+                            </button>
+</div>
+<!-- Tab Navigation -->
+<div class="flex border-b border-outline-variant">
+<button class="px-lg py-md font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors">Detalle</button>
+<button class="px-lg py-md font-label-md text-label-md text-primary border-b-2 border-primary">Historial</button>
+<button class="px-lg py-md font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors flex items-center gap-sm">
+                                Adjuntos <span class="bg-surface-container-high px-1.5 rounded-full text-[10px]">3</span>
+</button>
+</div>
+</div>
+<!-- Layout: Timeline + Sidebar -->
+<div class="grid grid-cols-12 gap-lg">
+<!-- Timeline Section -->
+<div class="col-span-8">
+<div class="space-y-6 relative">
+<!-- Timeline Item: 14:38 -->
+<div class="flex gap-md timeline-item relative">
+<div class="flex flex-col items-center timeline-dot">
+<div class="w-6 h-6 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center z-10">
+<span class="material-symbols-outlined text-[16px]">battery_change</span>
+</div>
+</div>
+<div class="flex-1 pb-4">
+<div class="flex items-center gap-sm mb-1">
+<span class="font-code-sm text-code-sm text-on-surface-variant">14:38 UTC</span>
+<span class="font-bold text-body-sm">Luis SRE</span>
+<span class="text-on-surface-variant text-body-sm">cambió estado de <span class="font-bold">'Abierto'</span> a <span class="font-bold">'En progreso'</span></span>
+</div>
+<div class="bg-surface p-md rounded-xl border border-outline-variant">
+<p class="text-body-sm italic">"Tomo este incidente, replicando con curl al endpoint"</p>
+</div>
+</div>
+</div>
+<!-- Timeline Item: Notification -->
+<div class="flex gap-md timeline-item relative">
+<div class="flex flex-col items-center timeline-dot">
+<div class="w-6 h-6 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center z-10">
+<span class="material-symbols-outlined text-[16px]">notifications</span>
+</div>
+</div>
+<div class="flex-1 pb-4">
+<div class="flex items-center gap-sm">
+<span class="font-code-sm text-code-sm text-on-surface-variant">14:38 UTC</span>
+<span class="text-body-sm"><span class="font-bold">Sistema</span> envió notificación al reportante (email + Slack).</span>
+</div>
+</div>
+</div>
+<!-- Timeline Item: Autoassign -->
+<div class="flex gap-md timeline-item relative">
+<div class="flex flex-col items-center timeline-dot">
+<div class="w-6 h-6 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center z-10">
+<span class="material-symbols-outlined text-[16px]">person</span>
+</div>
+</div>
+<div class="flex-1 pb-4">
+<div class="flex items-center gap-sm">
+<span class="font-code-sm text-code-sm text-on-surface-variant">14:36 UTC</span>
+<span class="text-body-sm"><span class="font-bold">Luis SRE</span> se autoasignó el ticket.</span>
+</div>
+</div>
+</div>
+<!-- Timeline Item: Attachment -->
+<div class="flex gap-md timeline-item relative">
+<div class="flex flex-col items-center timeline-dot">
+<div class="w-6 h-6 rounded-full bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center z-10">
+<span class="material-symbols-outlined text-[16px]">attachment</span>
+</div>
+</div>
+<div class="flex-1 pb-4">
+<div class="flex items-center gap-sm mb-2">
+<span class="font-code-sm text-code-sm text-on-surface-variant">14:24 UTC</span>
+<span class="text-body-sm"><span class="font-bold">Sistema</span>: adjunto agregado por María Dev.</span>
+</div>
+<div class="flex items-center gap-md bg-surface-container-low p-sm rounded-lg border border-outline-variant w-fit">
+<span class="material-symbols-outlined text-primary">description</span>
+<div>
+<div class="text-body-sm font-bold">logs-api-pagos-2026-05-17.txt</div>
+<div class="text-[10px] text-on-surface-variant uppercase">1.2 MB</div>
+</div>
+<button class="text-primary hover:bg-primary/10 p-xs rounded">
+<span class="material-symbols-outlined text-[18px]">download</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Timeline Item: Comment -->
+<div class="flex gap-md timeline-item relative">
+<div class="flex flex-col items-center timeline-dot">
+<div class="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center z-10">
+<span class="material-symbols-outlined text-[16px]">comment</span>
+</div>
+</div>
+<div class="flex-1 pb-4">
+<div class="flex items-center gap-sm mb-1">
+<span class="font-code-sm text-code-sm text-on-surface-variant">14:22 UTC</span>
+<span class="font-bold text-body-sm">María Dev</span>
+<span class="text-on-surface-variant text-body-sm">comentó:</span>
+</div>
+<div class="bg-surface-container-highest/30 p-md rounded-xl border border-outline-variant">
+<p class="text-body-sm">"Tengo capturas del log con stack trace, las adjunto"</p>
+</div>
+</div>
+</div>
+<!-- Timeline Item: Warning -->
+<div class="flex gap-md timeline-item relative">
+<div class="flex flex-col items-center timeline-dot">
+<div class="w-6 h-6 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center z-10">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+</div>
+<div class="flex-1 pb-4">
+<div class="flex items-center gap-sm">
+<span class="font-code-sm text-code-sm text-on-surface-variant">14:10 UTC</span>
+<span class="text-body-sm text-tertiary font-bold"><span class="font-bold">Sistema</span>: alerta SLA — 5 minutos para primera respuesta.</span>
+</div>
+</div>
+</div>
+<!-- Timeline Item: Created -->
+<div class="flex gap-md timeline-item relative">
+<div class="flex flex-col items-center timeline-dot">
+<div class="w-6 h-6 rounded-full bg-secondary text-white flex items-center justify-center z-10">
+<span class="material-symbols-outlined text-[16px]">settings</span>
+</div>
+</div>
+<div class="flex-1 pb-4">
+<div class="flex items-center gap-sm mb-1">
+<span class="font-code-sm text-code-sm text-on-surface-variant">14:02 UTC</span>
+<span class="text-body-sm"><span class="font-bold">Sistema</span>: ticket creado.</span>
+</div>
+<div class="text-body-sm text-on-surface-variant">Prioridad calculada <span class="font-bold">P1</span>, SLA primera respuesta 15 min.</div>
+</div>
+</div>
+<!-- Timeline Item: Reported -->
+<div class="flex gap-md timeline-item relative">
+<div class="flex flex-col items-center timeline-dot">
+<div class="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center z-10">
+<span class="material-symbols-outlined text-[16px]">report</span>
+</div>
+</div>
+<div class="flex-1">
+<div class="flex items-center gap-sm">
+<span class="font-code-sm text-code-sm text-on-surface-variant">14:02 UTC</span>
+<span class="text-body-sm font-bold">María Dev</span>
+<span class="text-body-sm">reportó el incidente.</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Sidebar -->
+<div class="col-span-4 space-y-lg">
+<!-- Filter Card -->
+<div class="bg-white rounded-xl border border-outline-variant p-md">
+<h3 class="font-label-md text-label-md text-on-surface uppercase mb-md">Filtrar por tipo</h3>
+<div class="flex flex-wrap gap-sm mb-lg">
+<div class="flex items-center gap-xs px-sm py-1 bg-surface-container rounded-full text-body-sm border border-outline-variant/30">
+                                        Cambio de estado <span class="material-symbols-outlined text-[14px] cursor-pointer">close</span>
+</div>
+<div class="flex items-center gap-xs px-sm py-1 bg-surface-container rounded-full text-body-sm border border-outline-variant/30">
+                                        Comentarios <span class="material-symbols-outlined text-[14px] cursor-pointer">close</span>
+</div>
+<div class="flex items-center gap-xs px-sm py-1 bg-surface-container rounded-full text-body-sm border border-outline-variant/30">
+                                        Asignaciones <span class="material-symbols-outlined text-[14px] cursor-pointer">close</span>
+</div>
+<div class="flex items-center gap-xs px-sm py-1 bg-surface-container rounded-full text-body-sm border border-outline-variant/30">
+                                        Adjuntos <span class="material-symbols-outlined text-[14px] cursor-pointer">close</span>
+</div>
+<div class="flex items-center gap-xs px-sm py-1 bg-surface-container rounded-full text-body-sm border border-outline-variant/30">
+                                        Escalamiento <span class="material-symbols-outlined text-[14px] cursor-pointer">close</span>
+</div>
+<div class="flex items-center gap-xs px-sm py-1 bg-surface-container rounded-full text-body-sm border border-outline-variant/30">
+                                        Notificaciones <span class="material-symbols-outlined text-[14px] cursor-pointer">close</span>
+</div>
+</div>
+<button class="w-full bg-white text-on-surface border border-outline-variant py-sm rounded-lg font-label-md text-label-md hover:bg-surface-container-low transition-colors flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined text-[18px]">download</span> Exportar historial (CSV)
+                                </button>
+</div>
+<!-- Sparkline Card -->
+<div class="bg-white rounded-xl border border-outline-variant p-md">
+<h3 class="font-label-md text-label-md text-on-surface uppercase mb-md">Actividad del Ticket</h3>
+<div class="flex flex-col">
+<span class="text-body-sm font-bold mb-xs">Eventos por hora (últimas 6h)</span>
+<div class="flex items-end gap-1 h-20 bg-surface-container-lowest border border-outline-variant/20 rounded p-sm">
+<!-- Bar Chart Elements -->
+<div class="flex-1 bg-primary/20 rounded-t h-4"></div>
+<div class="flex-1 bg-primary/30 rounded-t h-8"></div>
+<div class="flex-1 bg-primary/20 rounded-t h-2"></div>
+<div class="flex-1 bg-primary/50 rounded-t h-12"></div>
+<div class="flex-1 bg-primary/40 rounded-t h-10"></div>
+<div class="flex-1 bg-primary rounded-t h-16"></div>
+</div>
+<div class="flex justify-between mt-sm text-[10px] text-on-surface-variant font-code-sm">
+<span>09:00</span>
+<span>11:00</span>
+<span>13:00</span>
+<span>AHORA</span>
+</div>
+</div>
+</div>
+<!-- System Metrics Placeholder -->
+<div class="rounded-xl overflow-hidden h-40 relative group">
+<img alt="System monitoring dashboard" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" data-alt="A clean, high-tech dashboard interface showing network monitoring graphs and real-time server statistics. The UI is minimalist with a slate-50 background and indigo data lines. Soft lighting and low contrast outlines convey a sense of calm under pressure in a mission-critical NOC environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBobpzSOcB5ny4nFMvM45xmUTJHfg3tKeo1BI-4BVYr-z8mq5sXKo0ja5fXyFjjq9sYrk7JTLEUb-HdR1SAaCvkB1pSER9teUAwRRfnx8hOmpPSmzBssIRrnl4UFEblGm61jDJ8d7GSwEPYpVGhVuEROz_Qy-dEHOEZjcsDsaMgq8DNCIuM4J222cSg4Ke38ev1pK0A24vuz4JTjtffFyyUoxVlOdLwHKPlaKip5tQNVJWyVc0TlraD8xArzMbpHtKH5X_jH0Hkjds"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-md">
+<div class="text-white text-label-md font-bold">Estado del Gateway</div>
+<div class="text-error-container text-[10px] flex items-center gap-xs">
+<span class="w-1.5 h-1.5 bg-error rounded-full animate-pulse"></span> Degradación detectada
+                                    </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Micro-interaction Scripts -->
+<script>
+        document.querySelectorAll('.material-symbols-outlined.cursor-pointer').forEach(closeIcon => {
+            closeIcon.addEventListener('click', function() {
+                this.parentElement.style.opacity = '0';
+                setTimeout(() => this.parentElement.style.display = 'none', 300);
+            });
+        });
+
+        // Simple smooth entrance for timeline items
+        const timelineItems = document.querySelectorAll('.timeline-item');
+        timelineItems.forEach((item, index) => {
+            item.style.opacity = '0';
+            item.style.transform = 'translateY(10px)';
+            item.style.transition = `all 0.4s ease-out ${index * 0.05}s`;
+            setTimeout(() => {
+                item.style.opacity = '1';
+                item.style.transform = 'translateY(0)';
+            }, 50);
+        });
+    </script>
+</body></html>

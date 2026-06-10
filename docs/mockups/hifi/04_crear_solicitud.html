@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SRE/Ops Ticketing - Crear Nuevo Ticket</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                50: '#eef2ff',
+                100: '#e0e7ff',
+                200: '#c7d2fe',
+                300: '#a5b4fc',
+                400: '#818cf8',
+                500: '#6366f1',
+                600: '#4f46e5',
+                700: '#4338ca',
+                800: '#3730a3',
+                900: '#312e81',
+              },
+              slate: {
+                50: '#f8fafc',
+                100: '#f1f2f6',
+                200: '#e2e8f0',
+                300: '#cbd5e1',
+                400: '#94a3b8',
+                500: '#64748b',
+                600: '#475569',
+                700: '#334155',
+                800: '#1e293b',
+                900: '#0f172a',
+              }
+            },
+            borderRadius: {
+              "DEFAULT": "0.125rem",
+              "lg": "0.25rem",
+              "xl": "0.5rem",
+              "full": "0.75rem"
+            },
+            fontFamily: {
+              "headline": ["Inter", "sans-serif"],
+              "display": ["Inter", "sans-serif"],
+              "body": ["Inter", "sans-serif"],
+              "label": ["Inter", "sans-serif"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      body { font-family: 'Inter', sans-serif; }
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        vertical-align: middle;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+      }
+      .glass-card {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+      }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased min-h-screen">
+<!-- TopNavBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 bg-white border-b border-slate-200 h-16">
+<div class="flex items-center gap-4">
+<span class="text-xl font-headline font-bold text-slate-900 tracking-tight">SRE/Ops Ticketing</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative group hidden md:block">
+<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+<span class="material-symbols-outlined text-xl">search</span>
+</span>
+<input class="pl-10 pr-4 py-1.5 bg-slate-100 border-transparent rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:bg-white transition-all w-64" placeholder="Buscar servicios o tickets..." type="text"/>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+<span class="material-symbols-outlined">help</span>
+</button>
+<button class="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center text-white text-xs font-bold ml-2">
+                    OP
+                </div>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 p-4 space-y-2 bg-white border-r border-slate-200 hidden lg:block">
+<div class="mb-6 px-2">
+<h3 class="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-4">Principal</h3>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined text-xl">dashboard</span>
+                    Dashboard
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium bg-slate-100 text-primary-600 rounded-lg transition-all border-l-4 border-primary-600" href="#">
+<span class="material-symbols-outlined text-xl">confirmation_number</span>
+                    Tickets
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined text-xl">bar_chart</span>
+                    Métricas
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined text-xl">layers</span>
+                    Servicios
+                </a>
+</nav>
+</div>
+<div class="px-2 pt-4 border-t border-slate-100">
+<h3 class="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-4">Equipos</h3>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined text-xl text-slate-400">groups</span>
+                    Infraestructura
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined text-xl text-slate-400">security</span>
+                    Seguridad
+                </a>
+</nav>
+</div>
+<div class="absolute bottom-8 left-0 w-full px-4">
+<div class="p-4 rounded-xl bg-primary-50 border border-primary-100">
+<p class="text-xs text-primary-800 font-semibold mb-1">¿Necesitas ayuda rápida?</p>
+<p class="text-[11px] text-primary-600 leading-relaxed">Consulta la base de conocimientos o contacta al On-Call de turno.</p>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="lg:ml-64 pt-16 min-h-screen">
+<div class="max-w-7xl mx-auto p-8">
+<div class="mb-8">
+<nav class="flex text-xs text-slate-500 gap-2 mb-4">
+<a class="hover:text-primary-600" href="#">Inicio</a>
+<span>/</span>
+<a class="hover:text-primary-600" href="#">Tickets</a>
+<span>/</span>
+<span class="text-slate-900 font-medium">Nuevo ticket</span>
+</nav>
+<h1 class="text-3xl font-bold text-slate-900">Crear nuevo ticket</h1>
+<p class="text-slate-500 mt-1">Completa los detalles para iniciar una solicitud de servicio u operación.</p>
+</div>
+<div class="grid grid-cols-12 gap-8 items-start">
+<!-- Form Column -->
+<div class="col-span-12 lg:col-span-8 space-y-6">
+<!-- Form Card -->
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+<!-- Tabs Toggle -->
+<div class="flex p-1 bg-slate-100 m-6 rounded-lg w-fit">
+<button class="px-6 py-2 text-sm font-semibold rounded-md text-slate-500 hover:text-slate-700 transition-colors">
+                                Incidente
+                            </button>
+<button class="px-6 py-2 text-sm font-semibold rounded-md bg-primary-600 text-white shadow-sm">
+                                Solicitud de servicio
+                            </button>
+</div>
+<div class="px-6 pb-8 space-y-6">
+<!-- Info Banner -->
+<div class="flex items-start gap-4 p-4 bg-primary-50 border border-primary-100 rounded-lg">
+<span class="material-symbols-outlined text-primary-600 mt-0.5">info</span>
+<p class="text-sm text-primary-800 leading-relaxed">
+                                    Las solicitudes de servicio se atienden con SLAs estándar y no entran en la cola de incidentes críticos. Para fallos de disponibilidad, utiliza la pestaña "Incidente".
+                                </p>
+</div>
+<form class="space-y-6">
+<!-- Title -->
+<div>
+<label class="block text-sm font-semibold text-slate-700 mb-2">Título</label>
+<input class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 transition-all outline-none" placeholder="Ej. Acceso a Grafana para nuevo integrante" type="text"/>
+</div>
+<!-- Description -->
+<div>
+<label class="block text-sm font-semibold text-slate-700 mb-2">Descripción</label>
+<textarea class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 transition-all outline-none resize-none" placeholder="Detalla qué necesitas y para qué…" rows="4"></textarea>
+</div>
+<!-- Selects Row -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div>
+<label class="block text-sm font-semibold text-slate-700 mb-2">Tipo de solicitud</label>
+<select class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 transition-all outline-none">
+<option>Acceso a sistemas</option>
+<option>Configuración</option>
+<option>Cambio de capacidad</option>
+<option>Renovación de credenciales</option>
+<option>Otro</option>
+</select>
+</div>
+<div>
+<label class="block text-sm font-semibold text-slate-700 mb-2">Servicio destino</label>
+<select class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 transition-all outline-none">
+<option>Producción Core</option>
+<option>Plataforma de Datos</option>
+<option>Infraestructura Cloud</option>
+<option>Seguridad Perimetral</option>
+</select>
+</div>
+</div>
+<!-- Urgency Block -->
+<div>
+<label class="block text-sm font-semibold text-slate-700 mb-3">Urgencia</label>
+<div class="space-y-3">
+<label class="flex items-center gap-4 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-all">
+<input class="w-4 h-4 text-primary-600 focus:ring-primary-600 border-slate-300" name="urgency" type="radio"/>
+<div>
+<span class="block text-sm font-bold text-slate-900">Alta — Necesario en menos de 24h</span>
+<span class="text-xs text-slate-500">Requiere aprobación inmediata de gerencia.</span>
+</div>
+</label>
+<label class="flex items-center gap-4 p-3 border-2 border-primary-600 bg-primary-50/30 rounded-lg cursor-pointer transition-all">
+<input checked="" class="w-4 h-4 text-primary-600 focus:ring-primary-600 border-slate-300" name="urgency" type="radio"/>
+<div>
+<span class="block text-sm font-bold text-slate-900">Media — En esta semana</span>
+<span class="text-xs text-slate-500 text-primary-700">Flujo de trabajo estándar.</span>
+</div>
+</label>
+<label class="flex items-center gap-4 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-all">
+<input class="w-4 h-4 text-primary-600 focus:ring-primary-600 border-slate-300" name="urgency" type="radio"/>
+<div>
+<span class="block text-sm font-bold text-slate-900">Baja — Sin urgencia</span>
+<span class="text-xs text-slate-500">Mantenimientos programados o backlog general.</span>
+</div>
+</label>
+</div>
+</div>
+<!-- Date Picker -->
+<div class="max-w-xs">
+<label class="block text-sm font-semibold text-slate-700 mb-2">Fecha deseada de cumplimiento (Opcional)</label>
+<div class="relative">
+<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+<span class="material-symbols-outlined text-xl">calendar_today</span>
+</span>
+<input class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 transition-all outline-none" placeholder="DD/MM/AAAA" type="text"/>
+</div>
+</div>
+<!-- Dropzone -->
+<div>
+<label class="block text-sm font-semibold text-slate-700 mb-2">Adjuntos</label>
+<div class="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer group">
+<div class="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 group-hover:text-primary-600 group-hover:scale-110 transition-all mb-4">
+<span class="material-symbols-outlined text-2xl">cloud_upload</span>
+</div>
+<p class="text-sm font-medium text-slate-700">Arrastra archivos aquí o <span class="text-primary-600 underline">explora carpetas</span></p>
+<p class="text-xs text-slate-400 mt-2 text-center leading-relaxed">Máximo 10MB por archivo. Formatos permitidos: JPG, PNG, PDF, LOG.</p>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex items-center justify-end gap-4 pt-6 border-t border-slate-100">
+<button class="px-6 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" type="button">
+                                        Cancelar
+                                    </button>
+<button class="px-8 py-2.5 text-sm font-semibold bg-primary-600 text-white rounded-lg hover:bg-primary-700 shadow-lg shadow-primary-200 transition-all" type="submit">
+                                        Enviar solicitud
+                                    </button>
+</div>
+</form>
+</div>
+</div>
+</div>
+<!-- Right Column / Sidebar Cards -->
+<aside class="col-span-12 lg:col-span-4 space-y-6 sticky top-24">
+<!-- Separation Card -->
+<div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
+<div class="absolute -right-4 -top-4 w-24 h-24 bg-primary-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-700"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+<span class="material-symbols-outlined">split_scene</span>
+</div>
+<h3 class="font-bold text-slate-900 leading-tight">Cola separada de incidentes</h3>
+</div>
+<p class="text-sm text-slate-600 leading-relaxed">
+                                Esta solicitud será gestionada por el equipo de Operaciones bajo un flujo de trabajo administrativo. Esto asegura que los incidentes de disponibilidad no sean retrasados por tareas programadas.
+                            </p>
+</div>
+</div>
+<!-- SLA Card -->
+<div class="bg-indigo-900 text-white p-6 rounded-xl border border-indigo-950 shadow-xl overflow-hidden relative">
+<div class="absolute top-0 right-0 p-2">
+<span class="material-symbols-outlined text-indigo-700 text-6xl opacity-20 transform translate-x-4 -translate-y-4">timer</span>
+</div>
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-indigo-300">update</span>
+<span class="text-xs font-bold uppercase tracking-widest text-indigo-300">SLA Estimado</span>
+</div>
+<div class="text-4xl font-black mb-1">3 días hábiles</div>
+<p class="text-sm text-indigo-200 font-medium opacity-80">Basado en Urgencia Media</p>
+<div class="mt-4 w-full bg-indigo-800 h-1.5 rounded-full overflow-hidden">
+<div class="bg-indigo-400 h-full w-2/3"></div>
+</div>
+</div>
+</div>
+<!-- Checklist Card -->
+<div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+<h3 class="font-bold text-slate-900 mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400">task_alt</span>
+                            Requisitos comunes
+                        </h3>
+<ul class="space-y-4">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-slate-300 mt-0.5">check_box_outline_blank</span>
+<span class="text-sm text-slate-600 leading-tight">Aprobación del Project Lead</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-slate-300 mt-0.5">check_box_outline_blank</span>
+<span class="text-sm text-slate-600 leading-tight">Documento de arquitectura (si aplica)</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-slate-300 mt-0.5">check_box_outline_blank</span>
+<span class="text-sm text-slate-600 leading-tight">Justificación de negocio detallada</span>
+</li>
+</ul>
+<div class="mt-6 pt-6 border-t border-slate-100">
+<img alt="Business environment illustration" class="w-full h-32 object-cover rounded-lg" data-alt="A clean, professional illustration of a modern workspace with soft lighting. Stylized geometric representations of servers and network nodes in shades of indigo and slate gray against a light background. The mood is highly organized, technological, and minimalist, echoing a high-end enterprise software aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUJjJT3HuQtMUGg1Cz6aKT10t2g7C0J_aMXhcJXimW_Xr5wZUKVfRfdnfZVlU1g0ypUah-MYg7fZzJcmrPvINFupr3MX8JqCWjhX0ZT4notDj57ytU3P7OyzCBbUZkxjxjhP8bDEWFCPGczfSK52A7hyc2xZFhcvHHtZYvw9Tt5xSnIj0iEYJU4q1khCGQ5yeTay2kpy9NX1QtkpJHVZsDZ02on2hmo44wfKdao0bOE6z3mjF_zQMxoLL0eBZK3-5LZBafk5IkZcc"/>
+</div>
+</div>
+</aside>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="lg:ml-64 bg-slate-50 border-t border-slate-200">
+<div class="w-full py-6 px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+<div class="flex items-center gap-6">
+<span class="text-sm font-bold text-slate-400 tracking-tight">SRE/Ops System</span>
+<span class="text-xs text-slate-400">© 2026 SRE/Ops System - Confidencial</span>
+</div>
+<div class="flex items-center gap-6">
+<a class="text-xs text-slate-500 hover:text-primary-600 transition-colors" href="#">Términos</a>
+<a class="text-xs text-slate-500 hover:text-primary-600 transition-colors" href="#">Privacidad</a>
+<a class="text-xs text-slate-500 hover:text-primary-600 transition-colors" href="#">Soporte</a>
+</div>
+</div>
+</footer>
+<script>
+        // Simple interactivity for demonstration
+        document.querySelectorAll('input[name="urgency"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                // Reset all borders
+                document.querySelectorAll('input[name="urgency"]').forEach(r => {
+                    const parent = r.closest('label');
+                    parent.classList.remove('border-primary-600', 'bg-primary-50/30', 'border-2');
+                    parent.classList.add('border-slate-200');
+                    const labelText = parent.querySelector('.text-primary-700');
+                    if(labelText) labelText.classList.add('text-slate-500');
+                    if(labelText) labelText.classList.remove('text-primary-700');
+                });
+                
+                // Add border to active
+                if (this.checked) {
+                    const parent = this.closest('label');
+                    parent.classList.add('border-primary-600', 'bg-primary-50/30', 'border-2');
+                    parent.classList.remove('border-slate-200');
+                    const secondaryText = parent.querySelector('span:nth-child(2)');
+                    if(secondaryText) {
+                        secondaryText.classList.remove('text-slate-500');
+                        secondaryText.classList.add('text-primary-700');
+                    }
+                }
+            });
+        });
+    </script>
+</body></html>

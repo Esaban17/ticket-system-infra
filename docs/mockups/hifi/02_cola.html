@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SRE/Ops Tickets - Cola de tickets</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-container": "#ffd2be",
+                        "surface-bright": "#faf8ff",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed": "#ffdbcc",
+                        "outline-variant": "#c7c4d8",
+                        "secondary-fixed-dim": "#c2c6d3",
+                        "background": "#faf8ff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#171c25",
+                        "on-secondary-container": "#60646f",
+                        "primary-container": "#4f46e5",
+                        "on-background": "#131b2e",
+                        "surface-variant": "#dae2fd",
+                        "surface-dim": "#d2d9f4",
+                        "inverse-primary": "#c3c0ff",
+                        "on-surface": "#131b2e",
+                        "surface": "#faf8ff",
+                        "secondary": "#5a5e69",
+                        "outline": "#777587",
+                        "surface-tint": "#4d44e3",
+                        "surface-container-highest": "#dae2fd",
+                        "error-container": "#ffdad6",
+                        "surface-container": "#eaedff",
+                        "on-surface-variant": "#464555",
+                        "secondary-container": "#dee2ef",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#e2dfff",
+                        "on-secondary-fixed-variant": "#424751",
+                        "on-tertiary-fixed-variant": "#7b2f00",
+                        "tertiary-container": "#a44100",
+                        "on-primary-container": "#dad7ff",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed": "#0f0069",
+                        "primary": "#3525cd",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#283044",
+                        "secondary-fixed": "#dee2ef",
+                        "on-tertiary-fixed": "#351000",
+                        "surface-container-low": "#f2f3ff",
+                        "tertiary": "#7e3000",
+                        "error": "#ba1a1a",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "inverse-on-surface": "#eef0ff",
+                        "on-primary-fixed-variant": "#3323cc",
+                        "surface-container-high": "#e2e7ff",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb695"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "sm": "8px",
+                        "lg": "24px",
+                        "container-max": "1440px",
+                        "md": "16px",
+                        "gutter": "16px",
+                        "base": "4px",
+                        "xs": "4px",
+                        "xl": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "code-sm": ["JetBrains Mono"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "code-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #faf8ff;
+        }
+        .compact-table-row {
+            height: 40px;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c7c4d8;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="text-on-surface">
+<!-- Top Navigation Bar -->
+<header class="bg-surface-container-lowest border-b border-outline-variant fixed top-0 left-0 right-0 h-16 z-50 flex items-center px-lg">
+<div class="flex justify-between items-center w-full max-w-container-max mx-auto">
+<div class="flex items-center gap-xl">
+<span class="text-headline-sm font-headline-sm text-on-surface">SRE/Ops Tickets</span>
+<div class="relative w-96 hidden md:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container border border-outline-variant rounded-lg font-body-md focus:outline-none focus:ring-2 focus:ring-primary-container focus:border-primary-container transition-all" placeholder="Buscar por TKT ID o descripción..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="p-2 rounded-full hover:bg-secondary-container/50 transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 rounded-full hover:bg-secondary-container/50 transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="help">help</span>
+</button>
+<div class="flex items-center gap-sm ml-sm pl-md border-l border-outline-variant">
+<div class="text-right">
+<p class="font-label-md text-label-md text-on-surface leading-none">Ana SRE</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-tight">Admin Ops</p>
+</div>
+<img alt="Ana SRE" class="w-8 h-8 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrmP2ZR7YiK-VV7mNtleQ8j_zGfdc8-ndwzDQR_ULi5fiprj3tIbiJwUBJibAmbAKOotpYiDJp7DO-AjXgyMevaYIYliA3ZjsRsMHF0b1JkBg0Nul5m53gzxSdh-GW6CgjrKkdDDnQtf2n4qtRChv0dTcPwk9uSMT38igwH-Wcw9jgDVnMyOk3KIc-JcNBsLYG1n3qROQXleMXREQg9DJp1uHuXoQIWOrwQR5fK7axnPbz92sRy5qe9lRkQyjl31bs7nQg10nkvog"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Sidebar Navigation -->
+<nav class="fixed left-0 top-16 bottom-0 w-64 bg-surface border-r border-outline-variant flex flex-col p-md z-40">
+<div class="flex items-center gap-md p-sm mb-lg">
+<div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">terminal</span>
+</div>
+<div>
+<p class="font-headline-sm text-headline-sm text-primary leading-tight">Ana SRE</p>
+<p class="font-label-md text-label-md text-on-surface-variant">Site Reliability Engineer</p>
+</div>
+</div>
+<div class="space-y-1 flex-1">
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-md text-label-md">Inicio</span>
+</a>
+<!-- ACTIVE TAB -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg bg-secondary-container text-on-secondary-container font-semibold transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="confirmation_number" style="font-variation-settings: 'FILL' 1;">confirmation_number</span>
+<span class="font-label-md text-label-md">Cola de tickets</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="person_search">person_search</span>
+<span class="font-label-md text-label-md">Mis asignados</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="task_alt">task_alt</span>
+<span class="font-label-md text-label-md">Cerrados</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="assessment">assessment</span>
+<span class="font-label-md text-label-md">Reportes</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">Configuración</span>
+</a>
+</div>
+<div class="pt-md border-t border-outline-variant space-y-1">
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="font-label-md text-label-md">Documentación</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="support_agent">support_agent</span>
+<span class="font-label-md text-label-md">Soporte</span>
+</a>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="ml-64 mt-16 p-lg max-w-container-max mx-auto">
+<!-- Header Section -->
+<header class="mb-lg">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Cola de tickets</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Ordenada por prioridad calculada</p>
+</header>
+<!-- Filters Grid -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-md mb-lg flex flex-wrap items-center gap-md">
+<div class="flex items-center gap-sm">
+<label class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Estado:</label>
+<select class="bg-surface border-outline-variant text-body-sm rounded px-3 py-1 focus:ring-primary-container">
+<option>Abierto, En progreso</option>
+<option>Abierto</option>
+<option>En progreso</option>
+<option>Escalado</option>
+</select>
+</div>
+<div class="flex items-center gap-sm">
+<label class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Prioridad:</label>
+<select class="bg-surface border-outline-variant text-body-sm rounded px-3 py-1 focus:ring-primary-container">
+<option>Todas</option>
+<option>P1 - Crítica</option>
+<option>P2 - Alta</option>
+<option>P3 - Media</option>
+</select>
+</div>
+<div class="flex items-center gap-sm">
+<label class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Tipo:</label>
+<select class="bg-surface border-outline-variant text-body-sm rounded px-3 py-1 focus:ring-primary-container">
+<option>Incidente, Solicitud</option>
+<option>Incidente</option>
+<option>Solicitud</option>
+</select>
+</div>
+<button class="ml-auto flex items-center gap-sm text-primary font-label-md text-label-md hover:underline">
+<span class="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                Limpiar filtros
+            </button>
+</div>
+<!-- Ticket Table Container -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<div class="overflow-x-auto custom-scrollbar">
+<table class="w-full text-left border-collapse">
+<thead class="bg-slate-50 border-b border-outline-variant sticky top-0">
+<tr>
+<th class="px-md py-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">#TKT</th>
+<th class="px-md py-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Título</th>
+<th class="px-md py-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Tipo</th>
+<th class="px-md py-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Severidad</th>
+<th class="px-md py-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Prioridad</th>
+<th class="px-md py-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Estado</th>
+<th class="px-md py-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Asignado a</th>
+<th class="px-md py-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-right">SLA Restante</th>
+<th class="px-md py-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Row 1 -->
+<tr class="hover:bg-indigo-50/30 transition-colors compact-table-row">
+<td class="px-md font-code-sm text-code-sm text-primary font-semibold">TKT-1042</td>
+<td class="px-md font-body-md text-body-md font-semibold text-on-surface">API de pagos retorna 500</td>
+<td class="px-md font-body-sm text-body-sm">Incidente</td>
+<td class="px-md">
+<span class="px-2 py-0.5 rounded-full bg-red-50 text-red-600 font-label-md text-[10px] uppercase font-bold border border-red-200">Crítica</span>
+</td>
+<td class="px-md font-body-sm text-body-sm font-bold">P1</td>
+<td class="px-md">
+<span class="flex items-center gap-1 font-body-sm text-body-sm">
+<span class="w-2 h-2 rounded-full bg-indigo-600"></span> Abierto
+                                </span>
+</td>
+<td class="px-md font-body-sm text-body-sm text-on-surface-variant italic">--</td>
+<td class="px-md font-code-sm text-code-sm text-right text-on-surface">00:08</td>
+<td class="px-md text-center">
+<button class="px-3 py-1 bg-primary text-on-primary text-label-md rounded font-semibold hover:bg-primary/90 transition-all">Asignarme</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-indigo-50/30 transition-colors compact-table-row">
+<td class="px-md font-code-sm text-code-sm text-primary font-semibold">TKT-1041</td>
+<td class="px-md font-body-md text-body-md text-on-surface">Latencia alta en checkout</td>
+<td class="px-md font-body-sm text-body-sm">Incidente</td>
+<td class="px-md">
+<span class="px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 font-label-md text-[10px] uppercase font-bold border border-orange-200">Alta</span>
+</td>
+<td class="px-md font-body-sm text-body-sm font-bold">P2</td>
+<td class="px-md">
+<span class="flex items-center gap-1 font-body-sm text-body-sm">
+<span class="w-2 h-2 rounded-full bg-blue-500"></span> En progreso
+                                </span>
+</td>
+<td class="px-md font-body-sm text-body-sm text-on-surface-variant flex items-center gap-2 pt-2">
+<img class="w-5 h-5 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCDbjZCXaQrxT9yG6XwM6FtI4NmKV7fcF5faPboX5eEWz0N8vBlWwsAZqnKqcyrqL2-Ua5-vTJUL4E9xH8mUZcQ7ua3n4yzFhL3XQUH1Ohc1otic6C0pYhXd5-W1zzsYqWxK-Iw0UIDyG753Y1m8QJrb-6rbtlxYfO2QYZHj21x9chBuKoKB1wIfWEJ99zMRQEvzMMt9JTvSD5C00AVE0hJZBITkC6CBcnysDMkByxZU4rU4SGCyjoDBCEBu8QZTku8WiFzW76WF8k"/> Luis SRE
+                            </td>
+<td class="px-md font-code-sm text-code-sm text-right text-on-surface">00:45</td>
+<td class="px-md text-center">
+<button class="px-3 py-1 border border-outline-variant text-on-surface text-label-md rounded font-semibold hover:bg-surface-container-high transition-all">Ver</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-indigo-50/30 transition-colors compact-table-row">
+<td class="px-md font-code-sm text-code-sm text-primary font-semibold">TKT-1040</td>
+<td class="px-md font-body-md text-body-md text-on-surface">Solicitud acceso a Grafana</td>
+<td class="px-md font-body-sm text-body-sm">Solicitud</td>
+<td class="px-md">
+<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-label-md text-[10px] uppercase font-bold border border-amber-200">Media</span>
+</td>
+<td class="px-md font-body-sm text-body-sm font-bold">P3</td>
+<td class="px-md">
+<span class="flex items-center gap-1 font-body-sm text-body-sm">
+<span class="w-2 h-2 rounded-full bg-indigo-600"></span> Abierto
+                                </span>
+</td>
+<td class="px-md font-body-sm text-body-sm text-on-surface-variant italic">--</td>
+<td class="px-md font-code-sm text-code-sm text-right text-on-surface">47:00</td>
+<td class="px-md text-center">
+<button class="px-3 py-1 bg-primary text-on-primary text-label-md rounded font-semibold hover:bg-primary/90 transition-all">Asignarme</button>
+</td>
+</tr>
+<!-- Row 4 (EXPIRED SLA) -->
+<tr class="bg-red-50/40 hover:bg-red-100/40 transition-colors compact-table-row">
+<td class="px-md font-code-sm text-code-sm text-primary font-semibold">TKT-1039</td>
+<td class="px-md font-body-md text-body-md font-bold text-on-surface">Error 502 intermitente CDN</td>
+<td class="px-md font-body-sm text-body-sm">Incidente</td>
+<td class="px-md">
+<span class="px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 font-label-md text-[10px] uppercase font-bold border border-orange-200">Alta</span>
+</td>
+<td class="px-md font-body-sm text-body-sm font-bold">P2</td>
+<td class="px-md">
+<span class="flex items-center gap-1 font-body-sm text-body-sm">
+<span class="w-2 h-2 rounded-full bg-purple-500"></span> Escalado L2
+                                </span>
+</td>
+<td class="px-md font-body-sm text-body-sm text-on-surface-variant flex items-center gap-2 pt-2">
+<img class="w-5 h-5 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGOoZUhy2frRoogIid7nTk_MUr9BkVDoLxzTbCyx3eEpKrONPJtZ62yzlUXkju7RbcQE_bRDTMl7X3D8nLy-ijCN92lrIUwQdYEqLvK_0A4urky-Le1L1n3gRiED0rD0Td90oVytgbW4kq9ib5qNeqzFc5IVlDXtSuJK77486YADw5ZouN-SOJ9mUpal9EOlnHMYi-GSEJ9A-ThAv3iRBPdLQ8CnEZ7GoXtXhPnfkUdAvEm5Sp3_Caz0goA-vJ2q3eg_scylN-EnI"/> Ana SRE
+                            </td>
+<td class="px-md font-code-sm text-code-sm text-right text-red-600 font-bold">-00:12 SLA VENCIDO</td>
+<td class="px-md text-center">
+<button class="px-3 py-1 border border-outline-variant text-on-surface text-label-md rounded font-semibold hover:bg-white transition-all shadow-sm">Ver</button>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-indigo-50/30 transition-colors compact-table-row">
+<td class="px-md font-code-sm text-code-sm text-primary font-semibold">TKT-1038</td>
+<td class="px-md font-body-md text-body-md text-on-surface">Renovar cert TLS api.empresa.com</td>
+<td class="px-md font-body-sm text-body-sm">Solicitud</td>
+<td class="px-md font-body-sm text-body-sm">Alta</td>
+<td class="px-md font-body-sm text-body-sm font-bold">P2</td>
+<td class="px-md">
+<span class="flex items-center gap-1 font-body-sm text-body-sm">
+<span class="w-2 h-2 rounded-full bg-blue-500"></span> En progreso
+                                </span>
+</td>
+<td class="px-md font-body-sm text-body-sm text-on-surface-variant flex items-center gap-2 pt-2">
+<img class="w-5 h-5 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDR8ksMuQwZ2ISiXFp3FN414id4JUCI6TZijIXcEcIz9IrTe51unI0RqNZAmJhNXccQNnbBjFgIUXPTyiBiKegq2dd8ZbNyQlPeZdensfzt0A-8jrAjzdN6yVD9pwOqkdLCXIDwsDc1enYj3H6pQVyIzNRLTMoE7pDy48Viua2ObBZxdRFLMsAA2qvWA2_J-HcKdBksDFHQfjf0J55vaG40Q-gJ2VB_T_OoIGPQCUpYor3WgOXZIxXU6urOJKFc8eoKnrgCR2U2A1I"/> Pedro Ops
+                            </td>
+<td class="px-md font-code-sm text-code-sm text-right text-on-surface">04:30</td>
+<td class="px-md text-center"></td>
+</tr>
+<!-- Row 6 -->
+<tr class="hover:bg-indigo-50/30 transition-colors compact-table-row">
+<td class="px-md font-code-sm text-code-sm text-primary font-semibold">TKT-1037</td>
+<td class="px-md font-body-md text-body-md text-on-surface">DB read replica desincronizada</td>
+<td class="px-md font-body-sm text-body-sm">Incidente</td>
+<td class="px-md font-body-sm text-body-sm font-bold text-red-600">Crítica</td>
+<td class="px-md font-body-sm text-body-sm font-bold">P1</td>
+<td class="px-md">
+<span class="flex items-center gap-1 font-body-sm text-body-sm">
+<span class="w-2 h-2 rounded-full bg-blue-500"></span> En progreso
+                                </span>
+</td>
+<td class="px-md font-body-sm text-body-sm text-on-surface-variant flex items-center gap-2 pt-2">
+<img class="w-5 h-5 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2KNStPJZo857AkOeXhhL6ZClhYsNWlDpjzd8Kg3Mbps6r9N4nHMXYmyY3wdDk_ev-7Nyzd_rZrbcqo98Cyce1P3nsmMFcgfTQRc5BcaVTaF1G9gxxVs_AB-SIODU547GD0-akP1vx3EtcCsvxzX0mism2OtID06TZbY_F4Mpuy68M-N7yCBKqGpHm7M546PjLffHreFZxMx_wKZhGTx1dvhgAEqarVilYV_JorZkmTgIXdxBESJDvaGUrmwXAkH9A-ODoHL4ziZI"/> Luis SRE
+                            </td>
+<td class="px-md font-code-sm text-code-sm text-right text-on-surface">00:02</td>
+<td class="px-md text-center"></td>
+</tr>
+<!-- Row 7 -->
+<tr class="hover:bg-indigo-50/30 transition-colors compact-table-row">
+<td class="px-md font-code-sm text-code-sm text-primary font-semibold">TKT-1036</td>
+<td class="px-md font-body-md text-body-md text-on-surface">Crear bucket S3 logs-q3</td>
+<td class="px-md font-body-sm text-body-sm">Solicitud</td>
+<td class="px-md">
+<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-label-md text-[10px] uppercase font-bold border border-slate-200">Baja</span>
+</td>
+<td class="px-md font-body-sm text-body-sm font-bold">P4</td>
+<td class="px-md">
+<span class="flex items-center gap-1 font-body-sm text-body-sm">
+<span class="w-2 h-2 rounded-full bg-indigo-600"></span> Abierto
+                                </span>
+</td>
+<td class="px-md font-body-sm text-body-sm text-on-surface-variant italic">--</td>
+<td class="px-md font-code-sm text-code-sm text-right text-on-surface">71:00</td>
+<td class="px-md text-center"></td>
+</tr>
+<!-- Row 8 -->
+<tr class="hover:bg-indigo-50/30 transition-colors compact-table-row">
+<td class="px-md font-code-sm text-code-sm text-primary font-semibold">TKT-1035</td>
+<td class="px-md font-body-md text-body-md text-on-surface">Pipeline CI bloqueado</td>
+<td class="px-md font-body-sm text-body-sm">Incidente</td>
+<td class="px-md font-body-sm text-body-sm">Media</td>
+<td class="px-md font-body-sm text-body-sm font-bold">P3</td>
+<td class="px-md">
+<span class="flex items-center gap-1 font-body-sm text-body-sm">
+<span class="w-2 h-2 rounded-full bg-indigo-600"></span> Abierto
+                                </span>
+</td>
+<td class="px-md font-body-sm text-body-sm text-on-surface-variant italic">--</td>
+<td class="px-md font-code-sm text-code-sm text-right text-on-surface">03:15</td>
+<td class="px-md text-center"></td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Footer Pagination -->
+<div class="px-md py-3 flex items-center justify-between border-t border-outline-variant bg-slate-50">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Mostrando 1-8 de 47 tickets</span>
+<div class="flex items-center gap-1">
+<button class="p-1 hover:bg-slate-200 rounded transition-colors disabled:opacity-30" disabled="">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded bg-primary text-on-primary font-bold text-label-md">1</button>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-200 text-on-surface-variant font-bold text-label-md transition-colors">2</button>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-200 text-on-surface-variant font-bold text-label-md transition-colors">3</button>
+<span class="mx-1 text-on-surface-variant">...</span>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-200 text-on-surface-variant font-bold text-label-md transition-colors">6</button>
+<button class="p-1 hover:bg-slate-200 rounded transition-colors">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Action Button (FAB) - For Home/Dashboard style views -->
+<button class="fixed bottom-lg right-lg w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform z-50">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+</button>
+<script>
+        // Micro-interaction for hover states or tab selection
+        document.querySelectorAll('nav a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                // If not actual link
+                if(this.getAttribute('href') === '#') e.preventDefault();
+            });
+        });
+    </script>
+</body></html>
