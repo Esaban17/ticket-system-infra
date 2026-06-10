@@ -142,7 +142,8 @@ export class TicketsService {
     const limit = query.limit ?? DEFAULT_LIMIT;
     const items = await this.prisma.ticket.findMany({
       where,
-      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      // El enum Postgres declara critica primero: 'asc' = crítica → baja.
+      orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       take: limit,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
