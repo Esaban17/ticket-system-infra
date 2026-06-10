@@ -141,6 +141,14 @@ module "alb_controller" {
   oidc_provider_arn = module.eks.oidc_provider_arn
   region            = var.region
   vpc_id            = module.network.vpc_id
+
+  # Las referencias a outputs solo crean dependencia sobre el cluster/OIDC, NO
+  # sobre el node group. En destroy, Terraform tumbaba los nodos en paralelo y
+  # mataba los pods del controller mientras el Ingress esperaba a que ese mismo
+  # controller procesara su finalizer y borrara el ALB (deadlock del teardown
+  # del 2026-06-10). depends_on al módulo completo fuerza el orden correcto:
+  # ingress → controller → nodos.
+  depends_on = [module.eks]
 }
 
 # ---- Ingress + app (Deliverable C + D) -----------------------------------
