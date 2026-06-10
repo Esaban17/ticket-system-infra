@@ -40,6 +40,15 @@ export function readSession(): StoredSession | null {
   }
 }
 
+/** Elimina la sesión persistida (ej. ante un 401). */
+export function clearSession(): void {
+  try {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    // localStorage no disponible — nada que limpiar
+  }
+}
+
 export type QueryParams = Record<
   string,
   string | number | boolean | null | undefined
@@ -100,6 +109,13 @@ async function request<T>(
       problem = (await response.json()) as ProblemDetails;
     } catch {
       problem = undefined;
+    }
+    // Sesión inválida/expirada: limpiar y volver al login (excepto en el propio login).
+    if (response.status === 401 && !options.skipAuth) {
+      clearSession();
+      if (window.location.pathname !== '/login') {
+        window.location.assign('/login');
+      }
     }
     throw new ApiError(response.status, problem);
   }
