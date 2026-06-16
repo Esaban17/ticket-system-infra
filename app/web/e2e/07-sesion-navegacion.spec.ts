@@ -31,10 +31,14 @@ test.describe('Sesión y navegación de la interfaz', () => {
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
     await page.waitForURL('**/login');
 
-    // El botón Atrás del navegador no debe restaurar la sesión: el guard
-    // RequireAuth detecta que no hay token en localStorage y redirige a /login.
+    // El botón Atrás del navegador no debe restaurar la sesión. El login usa
+    // navigate(replace:true) → el historial no tiene una entrada previa con
+    // sesión activa; goBack() no navega o navega a /login de nuevo. En ambos
+    // casos el guard RequireAuth mantiene al usuario en /login.
+    // Se usa toHaveURL (polling) en lugar de waitForURL (espera evento de
+    // navegación) porque goBack() puede no producir ningún evento nuevo cuando
+    // el historial está en la entrada más antigua.
     await page.goBack();
-    await page.waitForURL('**/login');
     await expect(page).toHaveURL(/\/login/);
   });
 
