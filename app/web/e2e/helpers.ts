@@ -14,6 +14,13 @@ export const PASSWORD = 'e2e-password';
 
 /** Hace login con el email indicado y espera a aterrizar en /tickets. */
 export async function login(page: Page, email: string): Promise<void> {
+  // Si ya estamos en el origen ALB (algún test previo hizo login), limpiar la
+  // sesión de localStorage antes de navegar a /login. Sin esto, LoginPage ve
+  // session != null y devuelve <Navigate to="/tickets"> sin renderizar el form.
+  // En contextos nuevos (URL = about:blank) no hay sesión que borrar.
+  if (!page.url().startsWith('about:')) {
+    await page.evaluate(() => localStorage.removeItem('ticket-session'));
+  }
   await page.goto('/login');
   await page.getByTestId('login-email').fill(email);
   await page.getByTestId('login-password').fill(PASSWORD);
