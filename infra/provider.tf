@@ -38,21 +38,33 @@ provider "aws" {
   }
 }
 
-# Short-lived bearer token for the EKS API server (refreshed on every plan/apply).
-data "aws_eks_cluster_auth" "this" {
-  name = module.eks.cluster_name
-}
-
+# El provider kubernetes autentica contra EKS llamando a `aws eks get-token` en
+# cada request al API server (exec plugin). Esto evita que el token estático de
+# aws_eks_cluster_auth expire a mitad de un apply largo (TTL ~15 min), lo que
+# causaba "Error: Unauthorized" en resources con wait_for_completion = true
+# (p.ej. kubernetes_job.db_seed) cuando el apply superaba esos 15 minutos.
+# Los runners ubuntu-latest ya tienen AWS CLI v2; configure-aws-credentials@v4
+# exporta las credenciales como env vars que aws eks get-token consume.
 provider "kubernetes" {
   host                   = module.eks.cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-  token                  = data.aws_eks_cluster_auth.this.token
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--region", var.region]
+  }
 }
 
 provider "helm" {
   kubernetes {
     host                   = module.eks.cluster_endpoint
     cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-    token                  = data.aws_eks_cluster_auth.this.token
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--region", var.region]
+    }
   }
 }

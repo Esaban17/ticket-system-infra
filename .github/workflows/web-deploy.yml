@@ -105,12 +105,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Rollout: solo el módulo ingress (actualiza kubernetes_deployment.web
-      # con la nueva imagen; el provider kubernetes hace el rolling update).
-      - name: Rollout new web image (terraform apply -target=module.ingress)
+      # Rollout: target acotado al Deployment del web para evitar que Terraform
+      # toque db_seed ni el Deployment del API (los cuales usan image_tag del
+      # API y caen al default "d3" si no se pasa api_image_tag explícitamente).
+      # kubernetes_deployment.web solo depende del namespace → apply rápido, sin
+      # wait_for_completion de jobs, por lo que el token exec nunca expira.
+      - name: Rollout new web image (terraform apply -target=kubernetes_deployment.web)
         run: |
           terraform apply -auto-approve \
             -var-file=envs/dev/dev.tfvars \
             -var "web_image_tag=${{ steps.meta.outputs.tag }}" \
-            -target=module.ingress
+            -target=module.ingress.kubernetes_deployment.web
         working-directory: infra/
