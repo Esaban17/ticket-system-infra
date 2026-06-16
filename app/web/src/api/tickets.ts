@@ -10,13 +10,26 @@ import type {
   TicketEvent,
 } from './types';
 
+/** UUID v4 con fallback para contextos no-seguros (HTTP). `crypto.randomUUID`
+ *  solo está disponible en secure contexts (HTTPS/localhost). */
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 /**
  * Crea un ticket. Envía siempre un header `Idempotency-Key` (uuid):
  * si la petición se repite dentro de 24h el API devuelve el mismo ticket.
  */
 export function createTicket(
   body: CreateTicketRequest,
-  idempotencyKey: string = crypto.randomUUID(),
+  idempotencyKey: string = generateUUID(),
 ): Promise<Ticket> {
   return apiClient.post<Ticket>('/tickets', {
     body,
