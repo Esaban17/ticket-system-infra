@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env*
+e2e/
+playwright-report/
+test-results/
+.playwright-mcp/
+playwright.config.ts
+*.log
+.git/

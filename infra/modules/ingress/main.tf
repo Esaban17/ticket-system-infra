@@ -25,6 +25,14 @@ locals {
     "app.kubernetes.io/managed-by" = "terraform"
   }
 
+  # Labels propios del frontend: selector DISTINTO del API para evitar que
+  # kubernetes_service.web capture también los pods del API.
+  web_labels = {
+    "app.kubernetes.io/name"       = "ticket-system"
+    "app.kubernetes.io/component"  = "web"
+    "app.kubernetes.io/managed-by" = "terraform"
+  }
+
   # Prisma/libpq connection string. The password comes from the TF_VAR chain
   # and is stored only in the Kubernetes Secret below — never in a ConfigMap.
   database_url = "postgresql://${var.db_username}:${var.db_password}@${var.db_endpoint}/${var.db_name}?schema=public"
@@ -185,6 +193,106 @@ resource "kubernetes_service" "app" {
   spec {
     type     = "ClusterIP"
     selector = local.labels
+
+    port {
+      name        = "http"
+      port        = 80
+      target_port = "http"
+      protocol    = "TCP"
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Web frontend (SPA) — nginx sirviendo el build de Vite
+#
+# VITE_API_URL="" en el build → las llamadas a /v1/... son relativas → mismo
+# origen que el ALB → sin CORS. El healthcheck /healthz es servido por nginx
+# (location = /healthz → 200 'ok') para que el TG no quede unhealthy.
+#
+# wait_for_rollout = false evita un deadlock en el primer apply: el Deployment
+# se crea apuntando a la imagen recién provisionada pero el push de ECR aún no
+# ha ocurrido; el pod queda en ImagePullBackOff (temporal) sin bloquear Terraform.
+# El workflow web-deploy.yml publica la imagen y dispara un segundo apply que
+# resuelve el pull.
+# ---------------------------------------------------------------------------
+
+resource "kubernetes_deployment" "web" {
+  metadata {
+    name      = "ticket-system-web"
+    namespace = kubernetes_namespace.this.metadata[0].name
+    labels    = local.web_labels
+  }
+
+  wait_for_rollout = false
+
+  spec {
+    replicas = var.web_replicas
+
+    selector {
+      match_labels = local.web_labels
+    }
+
+    template {
+      metadata {
+        labels = local.web_labels
+      }
+
+      spec {
+        container {
+          name  = "web"
+          image = "${var.web_image}:${var.web_image_tag}"
+
+          port {
+            name           = "http"
+            container_port = 8080
+            protocol       = "TCP"
+          }
+
+          readiness_probe {
+            http_get {
+              path = "/healthz"
+              port = "http"
+            }
+            initial_delay_seconds = 5
+            period_seconds        = 10
+          }
+
+          liveness_probe {
+            http_get {
+              path = "/healthz"
+              port = "http"
+            }
+            initial_delay_seconds = 10
+            period_seconds        = 20
+          }
+
+          resources {
+            requests = {
+              cpu    = "50m"
+              memory = "64Mi"
+            }
+            limits = {
+              cpu    = "100m"
+              memory = "128Mi"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service" "web" {
+  metadata {
+    name      = "ticket-system-web"
+    namespace = kubernetes_namespace.this.metadata[0].name
+    labels    = local.web_labels
+  }
+
+  spec {
+    type     = "ClusterIP"
+    selector = local.web_labels
 
     port {
       name        = "http"
