@@ -55,8 +55,29 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
+      # Terraform se inicializa ANTES de resolver la URL del ECR para poder
+      # garantizar que el repositorio exista. Si terraform-apply.yml aún no
+      # corrió (p. ej. primer merge que toca infra y app/web a la vez), este
+      # paso crea module.registry_web y evita el RepositoryNotFoundException.
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.8"
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: infra/
+
+      # Garantiza que el repositorio ECR ticket-system-web exista antes de
+      # hacer el describe. Si ya existe, Terraform no hace nada (idempotente).
+      - name: Ensure ECR web repository exists
+        run: |
+          terraform apply -auto-approve \
+            -var-file=envs/dev/dev.tfvars \
+            -target=module.registry_web
+        working-directory: infra/
+
       # Deriva la URL del repo ECR sin hardcodear el account ID.
-      # El repo se llama "ticket-system-web" (ver infra/main.tf: module.registry_web).
       - name: Resolve ECR repository URL
         id: ecr
         run: |
@@ -83,15 +104,6 @@ jobs:
             VITE_API_URL=
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "~> 1.8"
-
-      - name: Terraform Init
-        run: terraform init
-        working-directory: infra/
 
       # Rollout: solo el módulo ingress (actualiza kubernetes_deployment.web
       # con la nueva imagen; el provider kubernetes hace el rolling update).
