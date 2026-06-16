@@ -31,15 +31,14 @@ test.describe('Sesión y navegación de la interfaz', () => {
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
     await page.waitForURL('**/login');
 
-    // El botón Atrás del navegador no debe restaurar la sesión. El login usa
-    // navigate(replace:true) → el historial no tiene una entrada previa con
-    // sesión activa; goBack() no navega o navega a /login de nuevo. En ambos
-    // casos el guard RequireAuth mantiene al usuario en /login.
-    // Se usa toHaveURL (polling) en lugar de waitForURL (espera evento de
-    // navegación) porque goBack() puede no producir ningún evento nuevo cuando
-    // el historial está en la entrada más antigua.
+    // El botón Atrás no debe restaurar la sesión. LoginPage usa
+    // navigate(from, { replace:true }) → reemplaza /login en el historial con
+    // /tickets, y el posterior logout reemplaza /tickets con /login de nuevo.
+    // El historial queda en [/login] (sin entradas anteriores), así que
+    // goBack() aterriza en about:blank (la página inicial vacía del navegador).
+    // En ambos casos (about:blank o /login) la sesión NO se restauró.
     await page.goBack();
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page).not.toHaveURL(/\/tickets/);
   });
 
   test('N07 — las pestañas Detalle/Historial/Adjuntos del ticket funcionan correctamente', async ({
