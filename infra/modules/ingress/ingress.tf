@@ -78,16 +78,57 @@ resource "kubernetes_ingress_v1" "app" {
 
     rule {
       http {
+        # Rutas específicas del API declaradas ANTES del catch-all del web.
+        # El ALB Controller asigna prioridades de regla según el orden de los
+        # paths: las rutas más específicas reciben una prioridad más alta (número
+        # menor) y se evalúan primero, evitando que "/" capture tráfico del API.
+
+        path {
+          path      = "/v1"
+          path_type = "Prefix"
+
+          backend {
+            service {
+              name = kubernetes_service.app.metadata[0].name
+              port { number = 80 }
+            }
+          }
+        }
+
+        path {
+          path      = "/healthz"
+          path_type = "Prefix"
+
+          backend {
+            service {
+              name = kubernetes_service.app.metadata[0].name
+              port { number = 80 }
+            }
+          }
+        }
+
+        path {
+          path      = "/readyz"
+          path_type = "Prefix"
+
+          backend {
+            service {
+              name = kubernetes_service.app.metadata[0].name
+              port { number = 80 }
+            }
+          }
+        }
+
+        # Catch-all: cualquier ruta no capturada arriba va al frontend (SPA).
+        # nginx sirve index.html vía try_files para que React Router funcione.
         path {
           path      = "/"
           path_type = "Prefix"
 
           backend {
             service {
-              name = kubernetes_service.app.metadata[0].name
-              port {
-                number = 80
-              }
+              name = kubernetes_service.web.metadata[0].name
+              port { number = 80 }
             }
           }
         }

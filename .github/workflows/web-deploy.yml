@@ -1,0 +1,104 @@
+name: Web Deploy
+
+# CD de la imagen del frontend (SPA Vite/React).
+#
+# En cada push a main que toque app/web/**:
+#   1. Build de la imagen Docker multi-stage (node:20-slim → nginx-unprivileged).
+#      VITE_API_URL="" → llamadas relativas /v1/... → same-origin con el ALB.
+#   2. Push a ECR (ticket-system-web) etiquetada con el short git SHA.
+#   3. Rollout: terraform apply -target=module.ingress -var web_image_tag=<sha>,
+#      que actualiza el kubernetes_deployment.web en EKS.
+#
+# Comparte el grupo de concurrencia terraform-apply-dev con api-deploy.yml y
+# terraform-apply.yml: todos operan sobre el mismo remote state → nunca corren
+# a la vez (cancel-in-progress: false → se encolan en orden).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/web/**"
+      - ".github/workflows/web-deploy.yml"
+
+concurrency:
+  group: terraform-apply-dev
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build, push & rollout web (dev)
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    env:
+      # Requerido por el provider kubernetes de Terraform para autenticarse en EKS.
+      TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Short SHA de 7 chars → tag inmutable (ECR IMMUTABLE), único por commit.
+      - name: Compute image tag (short SHA)
+        id: meta
+        run: echo "tag=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Deriva la URL del repo ECR sin hardcodear el account ID.
+      # El repo se llama "ticket-system-web" (ver infra/main.tf: module.registry_web).
+      - name: Resolve ECR repository URL
+        id: ecr
+        run: |
+          repo_url=$(aws ecr describe-repositories \
+            --repository-names ticket-system-web \
+            --query 'repositories[0].repositoryUri' \
+            --output text)
+          echo "repository=${repo_url}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build linux/amd64 (nodos EKS son x86_64).
+      # VITE_API_URL="" → el bundle llama /v1/... relativo → mismo origen.
+      - name: Build & push image to ECR
+        uses: docker/build-push-action@v6
+        with:
+          context: app/web
+          file: app/web/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.ecr.outputs.repository }}:${{ steps.meta.outputs.tag }}
+          build-args: |
+            VITE_API_URL=
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.8"
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: infra/
+
+      # Rollout: solo el módulo ingress (actualiza kubernetes_deployment.web
+      # con la nueva imagen; el provider kubernetes hace el rolling update).
+      - name: Rollout new web image (terraform apply -target=module.ingress)
+        run: |
+          terraform apply -auto-approve \
+            -var-file=envs/dev/dev.tfvars \
+            -var "web_image_tag=${{ steps.meta.outputs.tag }}" \
+            -target=module.ingress
+        working-directory: infra/

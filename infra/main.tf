@@ -106,6 +106,19 @@ module "registry" {
   repository_name = "${var.project_name}-api"
 }
 
+# ---- Registry (ECR for the web frontend image) ---------------------------
+# Segundo repositorio ECR para la imagen de la SPA (nginx + dist/ de Vite).
+# El workflow web-deploy.yml hace push aquí con tag = short SHA antes del
+# terraform apply -target=module.ingress -var web_image_tag=<sha>.
+
+module "registry_web" {
+  source = "./modules/registry"
+
+  env             = var.environment
+  name_prefix     = var.project_name
+  repository_name = "${var.project_name}-web"
+}
+
 # ---- EKS (Optional Track 1 + Deliverable F) ------------------------------
 # Deliverable F: the cluster consumes the D3 network module's VPC + subnet
 # outputs (no placeholder VPC). Managed node groups are pinned to the PRIVATE
@@ -169,6 +182,9 @@ module "ingress" {
   image     = module.registry.ecr_repository_url
   image_tag = var.api_image_tag
   app_port  = var.app_port
+
+  web_image     = module.registry_web.ecr_repository_url
+  web_image_tag = var.web_image_tag
 
   health_check_path     = var.health_check_path
   web_security_group_id = module.security.web_sg_id

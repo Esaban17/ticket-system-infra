@@ -109,3 +109,22 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# ---- Web frontend (SPA) ----------------------------------------------------
+
+variable "web_image" {
+  description = "Container image repository URL (ECR) for the web frontend SPA, WITHOUT the tag."
+  type        = string
+}
+
+variable "web_image_tag" {
+  description = "Tag of the web frontend container image to deploy (pushed to ECR by the build step)."
+  type        = string
+  default     = "bootstrap"
+}
+
+variable "web_replicas" {
+  description = "Number of web frontend pod replicas."
+  type        = number
+  default     = 1
+}

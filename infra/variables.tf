@@ -112,6 +112,12 @@ variable "api_image_tag" {
   default     = "d3"
 }
 
+variable "web_image_tag" {
+  description = "Tag of the ticket-system web frontend container image (in ECR) deployed to EKS. The web-deploy.yml workflow pushes this tag before the ingress module is applied."
+  type        = string
+  default     = "bootstrap"
+}
+
 # ---- EKS (Optional Track 1) ----------------------------------------------
 
 variable "eks_cluster_version" {

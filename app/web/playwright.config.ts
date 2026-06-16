@@ -1,20 +1,27 @@
 import { defineConfig } from '@playwright/test';
 
-// La suite asume el stack local corriendo:
-//  - API en http://localhost:8080 (con Postgres migrado y seeds aplicados)
-//  - Frontend en http://localhost:5173 (se levanta solo si no está corriendo)
+// Si E2E_BASE_URL está definida, la suite corre contra esa URL (p. ej. el ALB
+// de AWS dev) sin levantar el dev server de Vite. Si no, levanta Vite local.
+const baseURL = process.env['E2E_BASE_URL'] ?? 'http://localhost:5173';
+const useRemote = Boolean(process.env['E2E_BASE_URL']);
+
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
+  timeout: 45_000,
   retries: 0,
+  reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL,
     trace: 'retain-on-failure',
   },
-  webServer: {
-    command: 'npm run dev -- --port 5173 --strictPort',
-    url: 'http://localhost:5173',
-    reuseExistingServer: true,
-    timeout: 30_000,
-  },
+  ...(useRemote
+    ? {}
+    : {
+        webServer: {
+          command: 'npm run dev -- --port 5173 --strictPort',
+          url: 'http://localhost:5173',
+          reuseExistingServer: true,
+          timeout: 30_000,
+        },
+      }),
 });
