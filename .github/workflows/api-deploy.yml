@@ -6,10 +6,10 @@ name: API Deploy
 #   1. build de la imagen Docker (linux/amd64) desde app/api/Dockerfile,
 #   2. push a ECR etiquetada con el short git SHA (tags inmutables: cada SHA
 #      produce un tag único, no se reescribe ":latest"),
-#   3. rollout: terraform apply -target=module.ingress con
-#      -var api_image_tag=<sha>, que actualiza el Deployment de Kubernetes
-#      (la app se despliega vía el provider kubernetes de Terraform, no Helm;
-#      el tag a desplegar es var.api_image_tag — ver infra/main.tf).
+#   3. rollout: terraform apply con -target acotado a los 4 resources del API
+#      (db_seed, deployment, service, ingress) y -var api_image_tag=<sha>.
+#      El target acotado evita resetear kubernetes_deployment.web a la imagen
+#      por defecto (bootstrap, inexistente en ECR) que causaría ImagePullBackOff.
 #
 # Auth a AWS con el mismo patrón de secrets que terraform-apply.yml
 # (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION). El password de la
@@ -24,6 +24,7 @@ on:
     paths:
       - "app/api/**"
       - ".github/workflows/api-deploy.yml"
+  workflow_dispatch:
 
 # Comparte el grupo de concurrencia con terraform-apply.yml: ambos workflows
 # operan sobre el MISMO remote state, así que nunca deben correr a la vez.
@@ -101,13 +102,24 @@ jobs:
         run: terraform init
         working-directory: infra/
 
-      # Rollout: solo el módulo ingress (Deployment/Service/Ingress de la app).
-      # -var api_image_tag=<sha> hace que el Deployment apunte a la imagen recién
-      # publicada; el provider kubernetes hace el rolling update del Deployment.
-      - name: Rollout new image (terraform apply -target=module.ingress)
+      # Rollout: solo los resources del API dentro de module.ingress.
+      # Se targetean los 4 resources del API (db_seed, deployment, service,
+      # ingress) sin incluir kubernetes_deployment.web ni kubernetes_service.web.
+      # El cierre de dependencias de estos targets trae automáticamente: namespace,
+      # ServiceAccount (IRSA), ConfigMap, Secret y random_password.jwt — todo lo
+      # que el cluster nuevo necesita y que no se había aplicado desde la recreación
+      # del 2026-06-16 (api-deploy nunca corrió desde entonces; ECR = 0 imágenes).
+      #
+      # Por qué NO -target=module.ingress (full): dev.tfvars no pinea web_image_tag
+      # → default "bootstrap" (inexistente en ECR) → ImagePullBackOff en el web.
+      # El enfoque quirúrgico protege la imagen del web actual (85056ae).
+      - name: Rollout API (db_seed + deployment + service + ingress routing)
         run: |
           terraform apply -auto-approve \
             -var-file=envs/dev/dev.tfvars \
             -var "api_image_tag=${{ steps.meta.outputs.tag }}" \
-            -target=module.ingress
+            -target=module.ingress.kubernetes_job.db_seed \
+            -target=module.ingress.kubernetes_deployment.app \
+            -target=module.ingress.kubernetes_service.app \
+            -target=module.ingress.kubernetes_ingress_v1.app
         working-directory: infra/
