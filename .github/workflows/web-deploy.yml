@@ -105,15 +105,20 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Rollout: target acotado al Deployment del web para evitar que Terraform
-      # toque db_seed ni el Deployment del API (los cuales usan image_tag del
-      # API y caen al default "d3" si no se pasa api_image_tag explícitamente).
-      # kubernetes_deployment.web solo depende del namespace → apply rápido, sin
-      # wait_for_completion de jobs, por lo que el token exec nunca expira.
-      - name: Rollout new web image (terraform apply -target=kubernetes_deployment.web)
+      # Rollout: aplica el Deployment del web + el Service + el Ingress (rutas).
+      # - kubernetes_deployment.web: actualiza la imagen a web_image_tag=<sha>.
+      # - kubernetes_service.web: crea el ClusterIP si no existe (idempotente).
+      # - kubernetes_ingress_v1.app: aplica las 4 rutas del ALB
+      #     /v1, /healthz, /readyz → API ; / → web
+      #   Si el Service web faltaba, el Ingress no podía crear el TG correcto.
+      # Ninguno de estos resources referencia api_image_tag ni kubernetes_job.db_seed,
+      # por lo que el plan no toca el Deployment del API ni recrea el seed Job.
+      - name: Rollout web (deployment + service + ingress routing)
         run: |
           terraform apply -auto-approve \
             -var-file=envs/dev/dev.tfvars \
             -var "web_image_tag=${{ steps.meta.outputs.tag }}" \
-            -target=module.ingress.kubernetes_deployment.web
+            -target=module.ingress.kubernetes_deployment.web \
+            -target=module.ingress.kubernetes_service.web \
+            -target=module.ingress.kubernetes_ingress_v1.app
         working-directory: infra/
