@@ -10,7 +10,15 @@
 
 ## 0. Qué cambió desde la entrega anterior
 
-Esta es la **primera versión del documento de Escenarios de Prueba** y nace como artefacto separado de `docs/E2_PlanDePruebas.md`. Toma como insumo la Entrega #2 (el plan de pruebas con los casos `TU-`, `TI-`, `TE2E-`, `TUAT-`, `TSEC-`, `TC-`, `TS-`, `TUX-`) y la Entrega #1 (los 8 casos de uso CU-01 a CU-08 y sus criterios de éxito).
+Esta es la **primera versión del documento de Escenarios de Prueba** y nace como artefacto separado de `docs/E2_PlanDePruebas.md`.
+
+### Actualización 2026-06-16 — Resultados de la suite automatizada Playwright
+
+Se añade el **§6** con los resultados de la primera ejecución completa de los 10 tests E2E automatizados con Playwright contra el ambiente de desarrollo (`ENT-003 dev shared` — ALB HTTP). Los **10 tests pasan** (N01–N10, duración total 11.9 s). Durante la campaña se identificaron y corrigieron 3 defectos de infraestructura de prueba (no del producto):
+
+- **B01** — `crypto.randomUUID` no disponible en contexto HTTP → fix PR #59
+- **B02** — `waitForURL` / `toHaveURL` timeout tras `goBack()` con historial colapsado → fix PRs #59 y #60
+- **B03** — sesión activa en `localStorage` bloquea el formulario de login en el 2º `login()` del mismo test → fix PR #61 Toma como insumo la Entrega #2 (el plan de pruebas con los casos `TU-`, `TI-`, `TE2E-`, `TUAT-`, `TSEC-`, `TC-`, `TS-`, `TUX-`) y la Entrega #1 (los 8 casos de uso CU-01 a CU-08 y sus criterios de éxito).
 
 La diferencia frente a E2 es de **formato y propósito**:
 
@@ -624,6 +632,66 @@ Se evaluaron cuatro alternativas contra cuatro criterios obligatorios derivados 
 | EP-CU08-03 | CU-08 | Borde | Media | No ejecutado | TI-104 (extensión) |
 
 **Totales:** 24 escenarios = 8 felices + 4 errores controlados + 5 RBAC/negativos + 6 bordes + 1 rendimiento.
+
+---
+
+## 6. Suite automatizada Playwright — Run N01–N10 (2026-06-16)
+
+### 6.1 Metadata del run
+
+| Campo | Valor |
+|---|---|
+| **Herramienta** | Playwright (Chromium headless) |
+| **Config** | `playwright.config.ts` en `app/web/`; timeout por test: 45 s; workers: 3 |
+| **Ambiente** | `ENT-003 dev shared` — ALB HTTP `k8s-ticketsy-ticketsy-0187f58f9a-757327104.us-east-1.elb.amazonaws.com` |
+| **Fecha ejecución** | 2026-06-16 |
+| **Commit de la suite** | `9a633b0` (merge PR #61 — `fix/e2e-login-session-clear`) |
+| **Commit del producto API** | `a6b78fc` (merge PR #58 — rollout quirúrgico al cluster recreado) |
+| **Commit del producto web** | `6930125` (merge PR #59 — UUID fallback HTTP) |
+| **Resultado** | **10 passed / 0 failed** |
+| **Duración total** | 11.9 s |
+
+### 6.2 Detalle de casos
+
+| ID | Spec | Descripción | CU | Estado | Duración |
+|---|---|---|---|---|---|
+| N01 | `06-validacion-creacion` | Submit vacío muestra todos los errores de validación sin crear ticket | CU-01 | **Aprobado** | ~3.1 s |
+| N02 | `06-validacion-creacion` | Prioridad estimada cambia en vivo según severidad e impacto (tabla de decisión completa) | CU-01 | **Aprobado** | ~1.9 s |
+| N03 | `06-validacion-creacion` | UI condicional por tipo: campo "fecha deseada" para solicitudes, leyenda sev/urgencia para incidentes | CU-01 / CU-08 | **Aprobado** | ~5.4 s |
+| N04 | `06-validacion-creacion` | Botón Cancelar navega a `/tickets` sin crear ticket ni dejar datos residuales | CU-01 | **Aprobado** | ~1.0 s |
+| N05 | `07-sesion-navegacion` | Sesión persiste tras recargar la página; deep-link directo a ruta protegida no redirige a login | Sesión | **Aprobado** | ~2.1 s |
+| N06 | `07-sesion-navegacion` | Logout elimina la sesión; botón Atrás del navegador no restaura la sesión activa | Sesión | **Aprobado** | ~0.9 s |
+| N07 | `07-sesion-navegacion` | Pestañas Detalle / Historial / Adjuntos del ticket: navegación, `aria-selected` y contenido condicional | CU-05 | **Aprobado** | ~1.9 s |
+| N08 | `08-cola-rbac-filtros` | RBAC en la cola: reportante no ve la columna "Asignarme"; el agente sí ve al menos un botón | CU-02 / CU-06 | **Aprobado** | ~2.1 s |
+| N09 | `08-cola-rbac-filtros` | Filtro por severidad en la cola: sev-4 muestra el ticket creado; sev-1 lo oculta | CU-06 | **Aprobado** | ~1.8 s |
+| N10 | `08-cola-rbac-filtros` | Filtro sin coincidencias: estado vacío con mensaje + "Limpiar filtros" restaura la tabla | CU-06 | **Aprobado** | ~7.5 s |
+
+### 6.3 Defectos encontrados y resueltos durante la campaña
+
+Durante las iteraciones previas al resultado final se identificaron y corrigieron tres defectos de la infraestructura de prueba (no del producto):
+
+| ID | Síntoma | Causa raíz | Fix |
+|---|---|---|---|
+| **B01** | N07/N08/N09 — `TypeError: crypto.randomUUID is not a function` al crear ticket desde la UI | `createTicket()` usaba `crypto.randomUUID()` como parámetro por defecto; `crypto.randomUUID` solo está disponible en secure context (HTTPS/localhost). El ALB sirve HTTP. | **PR #59** — `generateUUID()` con fallback `Math.random()` en `app/web/src/api/tickets.ts` |
+| **B02** | N06 — timeout 45 s esperando evento de navegación tras `page.goBack()` | `LoginPage` usa `navigate(from, {replace:true})` → el historial queda en `[/login]`; `goBack()` aterriza en `about:blank` (sin entrada anterior) sin emitir evento de navegación; el test esperaba `waitForURL('**/login')`. | **PR #59** (1ª iteración): cambio a `expect(page).toHaveURL(/\/login/)`. **PR #60** (2ª iteración): cambio a `expect(page).not.toHaveURL(/\/tickets/)` para aceptar `about:blank` como resultado válido. |
+| **B03** | N07/N08/N09 — timeout 45 s esperando `getByTestId('login-email')` en el 2º `login()` del mismo test | `LoginPage` detecta sesión activa en localStorage y devuelve `<Navigate to="/tickets" replace>` sin renderizar el formulario. El helper `login()` no limpiaba la sesión del usuario anterior entre llamadas. | **PR #61** — `localStorage.removeItem('ticket-session')` antes de `page.goto('/login')` en `app/web/e2e/helpers.ts`, con guard `!page.url().startsWith('about:')` para contextos frescos. |
+
+### 6.4 Correspondencia con escenarios EP- de §4
+
+Los tests N01–N10 cubren la **capa de interfaz de usuario** (Chromium headless, SPA React) en el ambiente de desarrollo HTTP. Los escenarios `EP-CU0X-0X` de §4 cubren la **capa de API** (`POST /tickets`, `PATCH /tickets/state`, etc.) en el ambiente de staging con Cognito. Ambas capas son complementarias y no se reemplazan.
+
+| Test | Escenario EP- más relacionado | Diferencia de capa |
+|---|---|---|
+| N01 | EP-CU01-02 | N01: validación client-side (React form); EP: `400` server-side |
+| N02 | EP-CU01-01 | N02: preview de prioridad en UI; EP: campo `prioridad` calculado en response de API |
+| N03 | EP-CU08-01 | N03: campos condicionales en el form por tipo; EP: `tipo` en body del `POST` |
+| N04 | EP-CU01-01 | N04: navegación de cancelación en UI; sin equivalente directo en EP- |
+| N05 | — | Gestión de sesión frontend (localStorage); sin equivalente EP- |
+| N06 | — | Protección del historial del navegador; sin equivalente EP- |
+| N07 | EP-CU05-01 | N07: tabs en la UI del detalle; EP: endpoint `GET /tickets/{id}/history` |
+| N08 | EP-CU02-02 | N08: columna "Asignarme" visible/oculta en UI; EP: `403` en `POST /assign` |
+| N09 | EP-CU06-01 | N09: filtro de severidad en UI; EP: filtros combinados vía query params |
+| N10 | EP-CU06-01 | N10: estado vacío + reset en UI; EP: response `items=[]` del API |
 
 ---
 
