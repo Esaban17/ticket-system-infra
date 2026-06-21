@@ -62,20 +62,22 @@ terraform apply
 terraform output       # state_bucket_name, lock_table_name, region
 ```
 
-Los outputs ya están hardcoded en `infra/backend.tf`. Si los cambias, actualiza `backend.tf` y corre `terraform init -migrate-state` en `infra/`.
+Los outputs ya están en `infra/envs/dev/backend-dev.hcl`. Si los cambias, actualiza el `.hcl` y corre `terraform init -migrate-state -backend-config=envs/dev/backend-dev.hcl` en `infra/`.
 
-> **No** agregar backend block a `infra/bootstrap/` — su estado es local intencionalmente (commiteado al repo, excluido del `.gitignore` global). Detalle en [`docs/trade-offs/05-state-backend.md`](../../docs/trade-offs/05-state-backend.md).
+> **No** agregar backend block a `infra/bootstrap/` — su estado es local intencionalmente (commiteado al repo, excluido del `.gitignore` global).
 
 ---
 
-## Inicializar el workspace principal
+## Inicializar el workspace principal (Delivery 4 — Pattern A)
 
 ```bash
 cd infra/
 
-# Inicializa el backend remoto (S3 + DynamoDB lock). En la primera ejecución
-# Terraform pregunta si copiar el state local al backend — responder "yes".
-terraform init
+# Dev
+terraform init -backend-config=envs/dev/backend-dev.hcl
+
+# Staging
+terraform init -backend-config=envs/staging/backend-staging.hcl
 
 # Verifica el formato de todos los archivos .tf
 terraform fmt -recursive
@@ -104,8 +106,6 @@ terraform show tfplan
 terraform apply tfplan
 ```
 
-> **Nota:** El estado se guarda localmente en `terraform.tfstate`. No subir este archivo con credenciales o datos sensibles a un repositorio público. El archivo está en `.gitignore` solo a partir de Delivery 2 cuando se migra a backend remoto.
-
 ---
 
 ## Destruir recursos
@@ -121,70 +121,100 @@ terraform destroy -var-file=envs/dev/dev.tfvars
 ```
 infra/
 ├── provider.tf            # Provider AWS + versiones
-├── backend.tf             # Backend remoto S3 + DynamoDB lock (D2+)
+├── backend.tf             # Partial config (Pattern A, D4)
 ├── variables.tf           # Variables de entrada
 ├── outputs.tf             # Outputs expuestos (re-export de módulos)
 ├── main.tf                # Wiring de módulos
 ├── envs/
-│   ├── dev/dev.tfvars     # Valores para desarrollo
-│   └── prod/prod.tfvars   # Valores para producción
+│   ├── dev/
+│   │   ├── backend-dev.hcl  # Backend config dev
+│   │   └── dev.tfvars       # Valores para desarrollo
+│   └── staging/
+│       ├── backend-staging.hcl  # Backend config staging
+│       └── staging.tfvars   # Valores para staging (≥3 distintos de dev)
 ├── bootstrap/             # Workspace run-once para crear el backend (D2+)
 │   └── terraform.tfstate  # Local + commiteado intencionalmente
-├── modules/               # Módulos reutilizables (D2+)
+├── modules/               # Módulos reutilizables
+│   ├── network/           # VPC, subnets, NAT, VPC endpoints
+│   ├── security/          # SGs (web/app/db) + NACLs
 │   ├── storage/           # S3 con versioning, lifecycle, SSE, SSL-only
-│   ├── compute/           # Lambda worker async en VPC
-│   ├── database/          # RDS PostgreSQL con subnet group, SG, sensitive password
-│   └── eks/               # EKS cluster (Optional Track 1)
-├── evidence/              # Artefactos requeridos por el rubric de D2
+│   ├── compute/           # Lambda report-generator en VPC
+│   ├── database/          # RDS PostgreSQL
+│   ├── registry/          # ECR (API + web)
+│   ├── eks/               # EKS cluster
+│   ├── alb_controller/    # ALB Controller + IRSA
+│   ├── ingress/           # App stack (SA, ConfigMap, Deployment, Service, Ingress)
+│   ├── async/             # SQS main + DLQ (D4)
+│   ├── scheduler/         # EventBridge Scheduler + IAM role (D4)
+│   └── keda/              # KEDA Helm + IRSA + ScaledObject (D4)
+├── evidence/              # Artefactos requeridos por el rubric
 ├── docs/                  # Resúmenes MD de cada Delivery
 └── README.md              # Este archivo
 .github/
 └── workflows/
-    └── terraform-ci.yml   # Pipeline CI en cada PR a main
+    ├── terraform-ci.yml       # 3 jobs: fmt / validate / plan
+    ├── terraform-apply.yml    # plan-dev → apply-dev → apply-staging
+    ├── terraform-destroy.yml  # gated destroy por entorno
+    └── terraform-drift.yml    # drift detection diario (cron)
 ```
 
 ---
 
-## CI/CD — GitHub Actions
+## CI/CD — GitHub Actions (Delivery 4)
 
-El pipeline se dispara en cada Pull Request hacia `main`. Pasos en orden:
+### PR validation (3 status checks para el ruleset)
 
-| Paso | Comando | Qué verifica |
+| Job | Status check | Qué verifica |
 |---|---|---|
-| 1 | `terraform fmt --check -recursive` | Formato canónico HCL |
-| 2 | `terraform init -backend=false` | Resolución de versiones del provider |
-| 3 | `terraform validate` | Análisis estático sin llamadas a la API |
-| 4 | `terraform plan -var-file=envs/dev/dev.tfvars` | Plan real contra AWS |
-| 5 | Post plan como comentario en el PR | Visibilidad del plan para revisión |
+| `fmt` | `fmt` | `terraform fmt --check -recursive` |
+| `validate` | `validate` | `terraform init` + `terraform validate` |
+| `plan` | `plan` | Plan real contra AWS + sube artifact + PR comment |
 
-Los pasos 1–4 **bloquean el PR** si fallan. El paso 5 es no-bloqueante.
+### Apply (promoción de artefacto)
 
-### Secretos requeridos en GitHub
+```
+push a main → plan-dev → [tfplan artifact] → apply-dev (env: dev, auto)
+                                                       ↓
+                                             apply-staging (env: staging, revisor: gitcombo)
+```
 
-Ir a `Settings → Secrets and variables → Actions` y agregar:
+### Secrets requeridos
 
+**A nivel de repositorio** (`Settings → Secrets → Actions`):
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
-- `AWS_REGION` (valor: `us-east-1`)
+- `AWS_REGION` (`us-east-1`)
+- `TF_VAR_DB_PASSWORD` (contraseña de dev)
+
+**GitHub Environment `staging`**:
+- `STAGING_DB_PASSWORD` (contraseña de staging, distinta de dev)
+
+**GitHub Environments** (crear en UI `Settings → Environments`):
+- `dev` — sin revisor, auto-apply
+- `staging` — required reviewer: `gitcombo`
 
 ---
 
 ## Variables de entorno
 
-| Variable | Tipo | Dev | Prod |
+| Variable | Tipo | Dev | Staging |
 |---|---|---|---|
-| `environment` | `string` | `"dev"` | `"prod"` |
+| `environment` | `string` | `"dev"` | `"staging"` |
 | `project_name` | `string` | `"ticket-system"` | `"ticket-system"` |
 | `region` | `string` | `"us-east-1"` | `"us-east-1"` |
-| `tickets_bucket_suffix` | `string` | `"galileo-pdds"` | TBD en Delivery 2 |
+| `db_instance_class` | `string` | `"db.t4g.micro"` | `"db.t4g.small"` |
+| `eks_node_max_size` | `number` | `2` | `3` |
+| `sqs_message_retention_seconds` | `number` | `345600` | `86400` |
+| `keda_max_replica_count` | `number` | `5` | `3` |
 
 ---
 
 ## Track seleccionado
 
-**Optional Track 1 — Kubernetes / Amazon EKS**
+**Optional Track 1 — Kubernetes / Amazon EKS** (incluyendo **Deliverable F — KEDA, +25 pts**).
 
-Este equipo ha optado por el EKS track. El directorio `k8s/` en la raíz del repositorio contiene los manifests de Kubernetes (scaffolding para Delivery 3). En Delivery 2 se agregará el módulo Terraform para el cluster EKS usando `terraform-aws-modules/eks`. En Delivery 5 se configurará IRSA (IAM Roles for Service Accounts).
+EKS + KEDA auto-escala el consumer Deployment basado en profundidad de la cola SQS.
+See ADR 0011 para la comparativa con el track Lambda.
 
 ---
 
@@ -195,26 +225,8 @@ Este equipo ha optado por el EKS track. El directorio `k8s/` en la raíz del rep
 | D1 | 10 may | Workspace + CI pipeline |
 | D2 | 21 may | Módulos de cómputo, almacenamiento, BD + EKS + remote state |
 | D3 | 7 jun | Capa de red (VPC, subnets, NAT) — reemplaza default VPC placeholder |
-| D4 | 21 jun | Infraestructura asíncrona + pipeline CD |
+| D4 | 21 jun | Infraestructura asíncrona + pipeline CD + KEDA |
 | D5 | 25 jun | Seguridad, observabilidad, one-click deployment |
-
----
-
-## Network placeholder (Delivery 2)
-
-EKS, Lambda y RDS están desplegados en la **default VPC** de la cuenta AWS y sus default subnets en `us-east-1`. Es una decisión explícita autorizada por el rubric ("placeholder VPC at this stage if networking is not yet provisioned"). Delivery 3 reemplaza la default VPC por una VPC dedicada con subnets privadas/públicas y NAT gateway. Trade-off completo en [`docs/trade-offs/04-eks-track.md`](../../docs/trade-offs/04-eks-track.md).
-
----
-
-## Trade-offs documentados
-
-Toda decisión arquitectónica importante está justificada en [`docs/trade-offs/`](../docs/trade-offs/). Para D2:
-
-- [01 — Compute (Lambda vs Fargate vs EC2)](../docs/trade-offs/01-compute.md)
-- [02 — Storage (lifecycle / encryption / policy)](../docs/trade-offs/02-storage.md)
-- [03 — Database (RDS PG vs DynamoDB)](../docs/trade-offs/03-database.md)
-- [04 — EKS Track (entrar o saltar)](../docs/trade-offs/04-eks-track.md)
-- [05 — State backend (bootstrap pattern)](../docs/trade-offs/05-state-backend.md)
 
 ---
 
@@ -342,3 +354,78 @@ node i-0e044fd4ff6d0d9dc  privateIp=10.20.11.81  publicIp=null  az=us-east-1b
 
 Captura `kubectl get nodes -o wide` (opcional, desde una red que alcance EKS): `infra/evidence/eks-nodes-d3.png`.
 
+---
+
+## Evidence — Delivery 4
+
+*Tag: `oyd-delivery-4` · Ejecutar `bash infra/evidence/capture-delivery-4.sh` para los archivos `.txt`.*
+
+### Deliverable A — Async Messaging Module
+
+SQS main queue + DLQ con `redrive_policy` y `maxReceiveCount=3`. ARNs expuestos
+como outputs y referenciados sin wildcards en las políticas IAM.
+
+Salida de `terraform output` (queue URL, ARN, DLQ): [`async-foundation.txt`](./evidence/async-foundation.txt).
+
+### Deliverable B — Event-Driven Compute (VPC worker track)
+
+Consumer Deployment `ticket-system-consumer` (KEDA-managed) + IRSA dedicado
+(`sqs:ReceiveMessage + DeleteMessage + GetQueueAttributes + s3:PutObject`, sin wildcards).
+ConfigMap contiene `SQS_QUEUE_URL` poblado por Terraform.
+
+- Extracto del plan mostrando consumer IRSA + Deployment: [`event-source-plan.txt`](./evidence/event-source-plan.txt)
+- `kubectl describe deploy ticket-system-consumer` + logs del pod consumiendo: [`event-source.png`](./evidence/event-source.png)
+
+### Deliverable C — Scheduled Jobs
+
+EventBridge Scheduler invoca el Lambda `ticket-system-{env}-worker` (handler
+reescrito como report-generator) con un rol IAM dedicado que solo tiene
+`lambda:InvokeFunction` sobre el ARN del Lambda (más estrecho que el exec role).
+
+- Consola EventBridge mostrando el schedule y su destino: [`scheduler.png`](./evidence/scheduler.png)
+- Extracto del plan mostrando `aws_scheduler_schedule` + IAM role: [`scheduler-plan.txt`](./evidence/scheduler-plan.txt)
+
+### Deliverable D — Full CD Pipeline
+
+**PR validation (3 status checks):**
+- `fmt` — format check
+- `validate` — init + validate
+- `plan` — plan -out=tfplan + artifact upload + PR comment
+
+**Apply (plan-artifact promotion):**
+- `apply-dev` descarga `tfplan` y ejecuta `terraform apply tfplan` (env: `dev`, auto)
+- `apply-staging` requiere aprobación manual del reviewer (env: `staging`)
+
+- GitHub Environments (dev / staging + reviewer): [`github-environments.png`](./evidence/github-environments.png)
+- Apply run dev (artifact download visible): [`ci-apply-dev.png`](./evidence/ci-apply-dev.png)
+- Apply run staging (gate + aprobación): [`ci-apply-staging.png`](./evidence/ci-apply-staging.png)
+- Destroy workflow_dispatch + input environment: [`ci-destroy.png`](./evidence/ci-destroy.png)
+- Drift detection job summary: [`ci-drift.png`](./evidence/ci-drift.png)
+- Branch Ruleset en main (3 required checks): [`ruleset-config.png`](./evidence/ruleset-config.png)
+- PR bloqueado por check pendiente: [`ruleset-blocked-merge.png`](./evidence/ruleset-blocked-merge.png)
+
+### Deliverable E — End-to-End Async Proof
+
+Flujo completo: `curl → ALB → POST /v1/notifications/enqueue → SQS → consumer pod → S3`.
+
+```bash
+# 1. Producer — HTTP 202 + MessageId
+curl -X POST http://<alb>/v1/notifications/enqueue \
+  -H "Authorization: Bearer <token>" \
+  -d '{"event":"ticket_creado","ticketId":"<uuid>"}'
+# → {"status":"accepted","messageId":"<sqs-message-uuid>"}
+```
+
+- `curl` completo con respuesta 202 + MessageId: [`async-enqueue.txt`](./evidence/async-enqueue.txt)
+- `kubectl logs <consumer-pod>` mostrando `message_processed` con el mismo MessageId: [`async-consumer.png`](./evidence/async-consumer.png)
+- Consola S3 con el objeto `async/<MessageId>`: [`async-object.png`](./evidence/async-object.png)
+
+### Deliverable F — EKS Async Integration / KEDA (+25 pts)
+
+KEDA `2.15.1` instalado vía Helm en namespace `keda`. ScaledObject apunta al
+Deployment `ticket-system-consumer` con trigger `aws-sqs-queue` (`identityOwner=operator`).
+KEDA operator IRSA: `sqs:GetQueueAttributes` sobre el queue ARN exacto.
+
+- `kubectl get scaledobject -A` + `kubectl describe`: [`keda-scaled-object.png`](./evidence/keda-scaled-object.png)
+- `kubectl get hpa -A` (HPA gestionado por KEDA): [`keda-hpa.png`](./evidence/keda-hpa.png)
+- Evidencia CLI combinada: [`keda-evidence.txt`](./evidence/keda-evidence.txt)

@@ -79,6 +79,37 @@ resource "aws_iam_role_policy" "lambda_logs" {
   policy = data.aws_iam_policy_document.lambda_logs.json
 }
 
+# ---- S3 permissions (Delivery 4 — report generator) -------------------------
+# The report-generator Lambda lists async objects and writes summary reports to
+# the S3 bucket. Scoped to the SPECIFIC bucket ARN (no wildcard resources).
+# Only added when var.bucket_arn is provided; a null/empty value disables this
+# policy (backward-compatible with deployments that don't pass a bucket).
+
+data "aws_iam_policy_document" "lambda_s3" {
+  count = var.bucket_arn != "" ? 1 : 0
+
+  statement {
+    sid       = "AllowLambdaToListBucket"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = [var.bucket_arn]
+  }
+
+  statement {
+    sid       = "AllowLambdaToWriteReports"
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
+    resources = ["${var.bucket_arn}/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_s3" {
+  count  = var.bucket_arn != "" ? 1 : 0
+  name   = "${local.function_name}-s3"
+  role   = aws_iam_role.lambda_exec.id
+  policy = data.aws_iam_policy_document.lambda_s3[0].json
+}
+
 # AWS-managed policy required for Lambdas attached to a VPC (manages ENIs).
 # Attaching the AWS-managed policy keeps our own policy documents clean —
 # we don't write Resource: "*" ourselves.
@@ -126,6 +157,15 @@ resource "aws_lambda_function" "this" {
   timeout          = var.timeout_seconds
   filename         = data.archive_file.lambda.output_path
   source_code_hash = data.archive_file.lambda.output_base64sha256
+
+  # BUCKET_NAME is consumed by the report-generator handler (index.py) to list
+  # async objects and write daily summary reports. Passed from the storage module
+  # output via the root module — no hardcoded names.
+  environment {
+    variables = {
+      BUCKET_NAME = var.bucket_name
+    }
+  }
 
   vpc_config {
     subnet_ids         = var.subnet_ids

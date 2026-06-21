@@ -61,7 +61,12 @@ module "storage" {
   force_destroy = var.environment == "dev"
 }
 
-# ---- Compute (Lambda worker) ---------------------------------------------
+# ---- Compute (Lambda report-generator) -------------------------------------
+# The Lambda is reused from D2 but its handler is now the report-generator
+# (index.py) that lists async objects in S3 and writes a daily summary.
+# Invoked by the EventBridge Scheduler (module.scheduler) via the dedicated
+# scheduler IAM role (ADR 0013). S3 permissions are scoped to the specific
+# bucket ARN (no wildcard resources).
 
 module "compute" {
   source = "./modules/compute"
@@ -73,6 +78,10 @@ module "compute" {
   timeout_seconds = var.lambda_timeout_seconds
   vpc_id          = module.network.vpc_id
   subnet_ids      = module.network.private_subnet_ids
+
+  # D4: pass bucket so the Lambda can list and write S3 objects.
+  bucket_name = module.storage.bucket_id
+  bucket_arn  = module.storage.bucket_arn
 }
 
 # ---- Database (RDS PostgreSQL) -------------------------------------------
@@ -167,9 +176,40 @@ module "alb_controller" {
   depends_on = [module.eks, module.network]
 }
 
-# ---- Ingress + app (Deliverable C + D) -----------------------------------
+# ---- Async Messaging Module (Delivery 4 — Deliverable A) ------------------
+# SQS main queue + DLQ. Standard queue (not FIFO) with a redrive policy that
+# moves messages to the DLQ after max_receive_count failed delivery attempts.
+# Wired into the ingress module (producer SQS URL + consumer IRSA) and the
+# keda module (queue ARN for scaling metric). See ADR 0010.
+
+module "async" {
+  source = "./modules/async"
+
+  queue_name_prefix             = "${var.project_name}-${var.environment}-async"
+  visibility_timeout_seconds    = var.sqs_visibility_timeout_seconds
+  message_retention_seconds     = var.sqs_message_retention_seconds
+  max_receive_count             = var.sqs_max_receive_count
+  dlq_message_retention_seconds = var.sqs_dlq_retention_seconds
+}
+
+# ---- Scheduled Jobs (Delivery 4 — Deliverable C) --------------------------
+# EventBridge Scheduler invokes the report-generator Lambda on a cron schedule.
+# A dedicated scheduler IAM role with lambda:InvokeFunction scoped to the
+# specific Lambda ARN — narrower than the Lambda's own execution role (ADR 0013).
+
+module "scheduler" {
+  source = "./modules/scheduler"
+
+  name                = "${var.project_name}-${var.environment}-report-scheduler"
+  schedule_expression = var.scheduler_expression
+  target_lambda_arn   = module.compute.function_arn
+  scheduler_timezone  = var.scheduler_timezone
+}
+
+# ---- Ingress + app (Deliverable C + D, extended in D4) --------------------
 # Full app stack on EKS: ClusterIP Service behind an ALB Ingress, app IRSA for
-# least-privilege S3 access, ConfigMap (non-secret) + Secret (DATABASE_URL),
+# least-privilege S3+SQS access, consumer Deployment for async polling,
+# ConfigMap (non-secret, includes SQS_QUEUE_URL) + Secret (DATABASE_URL),
 # and a one-shot seed Job. depends_on ensures the controller is running first.
 
 module "ingress" {
@@ -197,5 +237,37 @@ module "ingress" {
   db_username = var.db_username
   db_password = var.db_password
 
+  # D4: wire the SQS queue into the app ConfigMap (SQS_QUEUE_URL) and IRSA.
+  sqs_queue_arn = module.async.queue_arn
+  sqs_queue_url = module.async.queue_url
+
+  # Consumer Deployment settings.
+  polling_batch_size = var.consumer_polling_batch_size
+
   depends_on = [module.alb_controller]
+}
+
+# ---- KEDA (Delivery 4 — Deliverable F, EKS Async Integration +25 pts) ----
+# Installs KEDA into the cluster and creates a ScaledObject that auto-scales
+# the consumer Deployment based on SQS queue depth. Uses the KEDA operator
+# IRSA (sqs:GetQueueAttributes) with identityOwner=operator. See ADR 0011.
+
+module "keda" {
+  source = "./modules/keda"
+
+  cluster_name      = local.eks_cluster_name
+  oidc_provider_arn = module.eks.oidc_provider_arn
+
+  keda_version = var.keda_version
+  aws_region   = var.region
+  queue_url    = module.async.queue_url
+  queue_arn    = module.async.queue_arn
+  namespace    = "ticket-system"
+
+  min_replica_count    = var.keda_min_replica_count
+  max_replica_count    = var.keda_max_replica_count
+  queue_length_trigger = var.keda_queue_length_trigger
+
+  # keda module applies AFTER the cluster and ingress (consumer Deployment) exist.
+  depends_on = [module.ingress]
 }

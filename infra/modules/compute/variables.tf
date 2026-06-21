@@ -1,10 +1,10 @@
 variable "environment" {
-  description = "Deployment environment (dev, prod). Used in resource naming and to size memory/timeout if needed."
+  description = "Deployment environment (dev, staging, prod). Used in resource naming and to size memory/timeout if needed."
   type        = string
 
   validation {
-    condition     = contains(["dev", "prod"], var.environment)
-    error_message = "environment must be either 'dev' or 'prod'."
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "environment must be 'dev', 'staging', or 'prod'."
   }
 }
 
@@ -57,4 +57,18 @@ variable "log_retention_days" {
   description = "Number of days CloudWatch keeps log events from this function. 14 days is a balance between debugging and cost."
   type        = number
   default     = 14
+}
+
+# ---- S3 integration (Delivery 4 — report generator) -------------------------
+
+variable "bucket_name" {
+  description = "Name of the S3 bucket the report-generator Lambda writes summary reports to. Passed to the Lambda as the BUCKET_NAME environment variable. Leave empty ('') to disable S3 integration (backward-compatible)."
+  type        = string
+  default     = ""
+}
+
+variable "bucket_arn" {
+  description = "ARN of the S3 bucket. Used to scope the Lambda execution role policy to s3:ListBucket + s3:PutObject on THIS specific bucket — no wildcard resource. Leave empty ('') to omit the S3 policy."
+  type        = string
+  default     = ""
 }
