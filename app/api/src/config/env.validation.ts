@@ -26,6 +26,10 @@ export const envSchema = z.object({
   // AWS (opcionales en desarrollo local)
   AWS_REGION: z.string().optional(),
   AWS_S3_BUCKET_ATTACHMENTS: z.string().optional(),
+  // SQS queue URL for the async notification producer (POST /v1/notifications/enqueue).
+  // Optional locally; required in production (injected via Kubernetes ConfigMap
+  // from the Terraform module.async.queue_url output).
+  SQS_QUEUE_URL: z.string().url().optional(),
 
   // SLA (minutos)
   SLA_CRITICAL_MINUTES: z.coerce.number().int().positive().default(60),

@@ -1,22 +1,57 @@
 name: Terraform CI
 
+# Plan-on-PR: validate and plan every change before it can be merged to main.
+# Three separate jobs expose three distinct status check names so the branch
+# ruleset can require ALL THREE to pass before allowing a merge (ADR 0012):
+#   fmt      — terraform fmt --check (no AWS needed)
+#   validate — terraform validate     (needs init + AWS for backend)
+#   plan     — terraform plan         (uploads artifact + posts PR comment)
 on:
   pull_request:
     branches: [main]
 
 jobs:
-  terraform:
-    name: Validate & Plan
+
+  # --------------------------------------------------------------------------
+  # Job 1: fmt
+  # Check that all .tf files are canonically formatted.
+  # Does NOT need AWS credentials or remote state — pure syntax check.
+  # Status check name (required by ruleset): "fmt"
+  # --------------------------------------------------------------------------
+  fmt:
+    name: fmt
     runs-on: ubuntu-latest
 
     permissions:
       contents: read
-      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.8"
+
+      - name: Terraform Format Check
+        run: terraform fmt --check -recursive
+        working-directory: infra/
+
+  # --------------------------------------------------------------------------
+  # Job 2: validate
+  # Initialize (against the remote backend) and validate all modules.
+  # Status check name (required by ruleset): "validate"
+  # --------------------------------------------------------------------------
+  validate:
+    name: validate
+    needs: fmt
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
 
     env:
-      # db_password is consumed by the database module via the sensitive
-      # variable var.db_password. It is provided via this env var (TF_VAR_*)
-      # so it never appears in any committed file.
       TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
 
     steps:
@@ -35,28 +70,72 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region:            ${{ secrets.AWS_REGION }}
 
-      # Step 1 — Format check
-      - name: Terraform Format Check
-        run: terraform fmt --check -recursive
-        working-directory: infra/
-
-      # Step 2 — Init (with remote backend, starting in Delivery 2)
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -backend-config=envs/dev/backend-dev.hcl
         working-directory: infra/
 
-      # Step 3 — Validate
       - name: Terraform Validate
         run: terraform validate
         working-directory: infra/
 
-      # Step 4 — Plan
-      - name: Terraform Plan
-        id: plan
-        run: terraform plan -var-file=envs/dev/dev.tfvars -no-color 2>&1 | tee plan.txt
+  # --------------------------------------------------------------------------
+  # Job 3: plan
+  # Generate the plan, upload it as an artifact for artifact-promotion apply,
+  # and post it as a PR comment so reviewers see exactly what will change.
+  # Status check name (required by ruleset): "plan"
+  # --------------------------------------------------------------------------
+  plan:
+    name: plan
+    needs: validate
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    env:
+      TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.8"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -backend-config=envs/dev/backend-dev.hcl
         working-directory: infra/
 
-      # Step 5 — Post plan as PR comment (only if plan.txt was produced)
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan \
+            -var-file=envs/dev/dev.tfvars \
+            -out=tfplan \
+            -no-color \
+            2>&1 | tee plan.txt
+        working-directory: infra/
+
+      # Upload the binary plan artifact so apply-dev can download and apply it
+      # without re-planning — this is the plan-artifact promotion pattern (ADR 0012).
+      - name: Upload plan artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-dev
+          path: infra/tfplan
+          retention-days: 1
+
       - name: Post Plan as PR Comment
         if: always() && hashFiles('infra/plan.txt') != ''
         uses: actions/github-script@v7

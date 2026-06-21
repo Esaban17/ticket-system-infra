@@ -1,35 +1,48 @@
 name: Terraform Destroy
 
-# Manual teardown of the dev stack. Runs from GitHub's network, which CAN reach
-# the EKS API endpoint, so `terraform destroy` removes the Kubernetes Ingress
-# first — letting the AWS Load Balancer Controller delete its ALB cleanly —
-# before destroying the cluster and the rest of the AWS resources. A local
-# destroy cannot do this when the EKS endpoint is firewalled.
+# Manual teardown of a specific environment. Runs from GitHub's network so
+# terraform destroy can reach the EKS API endpoint and remove the Kubernetes
+# Ingress first (allowing the ALB Controller to delete the ALB cleanly) before
+# destroying the cluster and AWS resources. A local destroy may fail if the
+# EKS endpoint is firewalled.
+#
+# Requires two inputs:
+#   environment — which stack to destroy (dev or staging)
+#   confirm     — must type "destroy" exactly to proceed (safety gate)
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: "Environment to destroy"
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
       confirm:
-        description: 'Type "destroy" to confirm tearing down the dev stack'
+        description: 'Type "destroy" to confirm teardown of the selected environment'
         required: true
         default: ""
 
 # Share the apply concurrency group so a destroy never overlaps an apply.
 concurrency:
-  group: terraform-apply-dev
+  group: terraform-apply
   cancel-in-progress: false
 
 jobs:
   destroy:
-    name: Destroy (dev)
+    name: Destroy (${{ github.event.inputs.environment }})
     # Safety gate: only run when the operator typed exactly "destroy".
     if: ${{ github.event.inputs.confirm == 'destroy' }}
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
 
     permissions:
       contents: read
 
     env:
-      TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+      # Use the environment-scoped secret matching the chosen environment.
+      TF_VAR_db_password: ${{ github.event.inputs.environment == 'staging' && secrets.STAGING_DB_PASSWORD || secrets.TF_VAR_DB_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -43,14 +56,21 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      - name: Confirm target environment
+        run: echo "Destroying environment=${{ github.event.inputs.environment }}"
 
       - name: Terraform Init
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config=envs/${{ github.event.inputs.environment }}/backend-${{ github.event.inputs.environment }}.hcl
         working-directory: infra/
 
       - name: Terraform Destroy
-        run: terraform destroy -auto-approve -var-file=envs/dev/dev.tfvars
+        run: |
+          terraform destroy -auto-approve \
+            -var-file=envs/${{ github.event.inputs.environment }}/${{ github.event.inputs.environment }}.tfvars
         working-directory: infra/

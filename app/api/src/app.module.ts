@@ -16,6 +16,7 @@ import { UsersModule } from '@/users/users.module';
 import { TicketsModule } from '@/tickets/tickets.module';
 import { AttachmentsModule } from '@/attachments/attachments.module';
 import { ReportsModule } from '@/reports/reports.module';
+import { NotificationsModule } from '@/notifications/notifications.module';
 import { HealthController } from '@/health/health.controller';
 
 /**
@@ -51,6 +52,8 @@ import { HealthController } from '@/health/health.controller';
     TicketsModule,
     AttachmentsModule,
     ReportsModule,
+    // D4 — Async producer: POST /v1/notifications/enqueue → SQS queue.
+    NotificationsModule,
   ],
   controllers: [
     // Liveness/readiness probes for the ALB target group (outside /v1 prefix).

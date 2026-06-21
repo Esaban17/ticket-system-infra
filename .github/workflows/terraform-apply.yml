@@ -1,7 +1,15 @@
 name: Terraform Apply
 
-# Apply-on-merge (Deliverable E): when a PR is merged to main, provision the
-# networking + ingress changes. Plan-on-PR lives in terraform-ci.yml.
+# Apply pipeline with plan-artifact promotion (ADR 0012):
+#   plan-dev    — plan dev, upload tfplan artifact
+#   apply-dev   — download tfplan, apply it verbatim (GitHub Environment: dev, auto)
+#   apply-staging — plan+apply staging (GitHub Environment: staging, gated reviewer)
+#
+# Why plan-artifact promotion?
+#   The artifact ensures apply-dev executes EXACTLY the plan reviewed in CI,
+#   not a re-plan that might differ due to timing, drift, or race conditions.
+#   apply-staging does a fresh plan because staging is ephemeral (cold-start
+#   from zero each time; it has no pre-existing plan artifact).
 on:
   push:
     branches: [main]
@@ -9,27 +17,29 @@ on:
       - "infra/**"
       - ".github/workflows/terraform-apply.yml"
 
-# Never run two applies against the same remote state at once.
+# Never run two applies against the same environment's remote state at once.
 concurrency:
-  group: terraform-apply-dev
+  group: terraform-apply
   cancel-in-progress: false
 
 jobs:
-  terraform-apply:
-    name: Apply (dev)
-    # Kill-switch de costos: con la variable de repo INFRA_AUTO_APPLY en
-    # "false" el apply-on-merge se salta (el stack debe quedarse destruido).
-    # Sin la variable o con cualquier otro valor, aplica normal (Deliverable E).
-    # Visto el 2026-06-10: un merge a infra/** re-aplicó el stack en plena
-    # ventana de teardown porque compartía el concurrency group con destroy.
-    if: ${{ vars.INFRA_AUTO_APPLY != 'false' }}
+
+  # --------------------------------------------------------------------------
+  # Job 1: plan-dev
+  # Generate the dev plan and upload it as an artifact so apply-dev can
+  # apply the exact plan reviewed in the PR without re-planning.
+  # --------------------------------------------------------------------------
+  plan-dev:
+    name: Plan (dev)
     runs-on: ubuntu-latest
+
+    # Kill-switch: skip the entire pipeline when INFRA_AUTO_APPLY is 'false'.
+    if: ${{ vars.INFRA_AUTO_APPLY != 'false' }}
 
     permissions:
       contents: read
 
     env:
-      # Sensitive value injected as TF_VAR_* — never committed (rubric).
       TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
 
     steps:
@@ -44,33 +54,147 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region:            ${{ secrets.AWS_REGION }}
 
-      - name: Terraform Init
-        run: terraform init
+      - name: Terraform Init (dev)
+        run: terraform init -backend-config=envs/dev/backend-dev.hcl
         working-directory: infra/
 
-      # Dependency order (documented in infra/docs/delivery-3-summary.md):
-      # the Kubernetes/Helm providers authenticate against the EKS cluster, so
-      # the cluster + its prerequisites must exist before the in-cluster
-      # resources (ALB Controller, app, Ingress) can be planned/applied.
-      # Phase 1 builds the AWS infrastructure (network → security → eks, etc.).
-      - name: Apply infrastructure (network, security, eks, ...)
+      - name: Terraform Plan (dev)
         run: |
-          terraform apply -auto-approve -var-file=envs/dev/dev.tfvars \
+          terraform plan \
+            -var-file=envs/dev/dev.tfvars \
+            -out=tfplan \
+            -no-color
+        working-directory: infra/
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-dev-${{ github.run_id }}
+          path: infra/tfplan
+          retention-days: 1
+
+  # --------------------------------------------------------------------------
+  # Job 2: apply-dev
+  # Download the tfplan artifact and apply it without re-planning.
+  # terraform apply <planfile> cannot accept -target flags; the plan already
+  # encodes the correct dependency order. Since the dev EKS cluster already
+  # exists, a single apply is sufficient (no two-phase bootstrap needed).
+  # --------------------------------------------------------------------------
+  apply-dev:
+    name: Apply (dev)
+    needs: plan-dev
+    runs-on: ubuntu-latest
+    environment: dev
+
+    permissions:
+      contents: read
+
+    env:
+      TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.8"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      - name: Terraform Init (dev)
+        run: terraform init -backend-config=envs/dev/backend-dev.hcl
+        working-directory: infra/
+
+      # Download the exact binary plan produced by plan-dev — no re-plan.
+      # The plan file encodes the full dependency graph; Terraform applies
+      # resources in the correct order (EKS before in-cluster resources).
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-dev-${{ github.run_id }}
+          path: infra/
+
+      - name: Apply plan (dev)
+        run: terraform apply tfplan
+        working-directory: infra/
+
+  # --------------------------------------------------------------------------
+  # Job 3: apply-staging
+  # Plan + apply the staging environment from scratch. Uses the GitHub
+  # Environment "staging" which requires a manual approval from the designated
+  # reviewer before proceeding (ADR 0012). Runs only after apply-dev succeeds.
+  #
+  # Two-phase apply because staging is a cold-start: the EKS cluster doesn't
+  # exist yet, so the Kubernetes/Helm provider can't connect during a full
+  # plan. Phase 1 creates the AWS infra (incl. EKS); Phase 2 creates the
+  # in-cluster resources once the cluster endpoint is reachable.
+  # --------------------------------------------------------------------------
+  apply-staging:
+    name: Apply (staging)
+    needs: apply-dev
+    runs-on: ubuntu-latest
+    environment: staging
+
+    permissions:
+      contents: read
+
+    env:
+      # Staging uses a separate secret scoped to the GitHub Environment.
+      TF_VAR_db_password: ${{ secrets.STAGING_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.8"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      - name: Terraform Init (staging)
+        run: terraform init -backend-config=envs/staging/backend-staging.hcl
+        working-directory: infra/
+
+      # Phase 1: create AWS infra (network → EKS, SQS, scheduler) before the
+      # Kubernetes/Helm provider tries to connect to a cluster that doesn't
+      # exist yet (cold-start chicken-egg, same as dev's first apply in D3).
+      - name: Apply infrastructure (network → eks, async, scheduler)
+        run: |
+          terraform apply -auto-approve \
+            -var-file=envs/staging/staging.tfvars \
             -target=module.network \
             -target=module.security \
             -target=module.storage \
             -target=module.registry \
+            -target=module.registry_web \
             -target=module.compute \
             -target=module.database \
-            -target=module.eks
+            -target=module.eks \
+            -target=module.async \
+            -target=module.scheduler
         working-directory: infra/
 
-      # Phase 2 applies everything, adding the in-cluster resources now that the
-      # cluster is reachable (ALB Controller Helm release + app + Ingress).
-      - name: Apply full stack (alb_controller, ingress)
-        run: terraform apply -auto-approve -var-file=envs/dev/dev.tfvars
+      # Phase 2: apply everything else now that the cluster endpoint is live.
+      - name: Apply full stack (alb_controller, ingress, keda)
+        run: |
+          terraform apply -auto-approve \
+            -var-file=envs/staging/staging.tfvars
         working-directory: infra/

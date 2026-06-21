@@ -31,6 +31,13 @@ export const configuration = (env: EnvConfig) => ({
     s3: {
       bucketAttachments: env.AWS_S3_BUCKET_ATTACHMENTS,
     },
+    sqs: {
+      // URL of the async notification queue (Delivery 4). Populated from the
+      // Kubernetes ConfigMap (SQS_QUEUE_URL) which is set by Terraform from
+      // module.async.queue_url. Undefined locally — the service logs a warning
+      // and skips the SQS call if not set.
+      queueUrl: env.SQS_QUEUE_URL,
+    },
   },
 
   sla: {
