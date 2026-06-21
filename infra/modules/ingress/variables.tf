@@ -128,3 +128,35 @@ variable "web_replicas" {
   type        = number
   default     = 1
 }
+
+# ---- Async consumer (Delivery 4 — Deliverable B) -----------------------------
+
+variable "sqs_queue_arn" {
+  description = "ARN of the SQS queue. Used to scope the consumer IRSA policy and to add sqs:SendMessage to the app (producer) IRSA policy. Leave empty ('') to disable consumer resources (backward-compatible)."
+  type        = string
+  default     = ""
+}
+
+variable "sqs_queue_url" {
+  description = "URL of the SQS queue. Injected into the consumer Deployment as the SQS_QUEUE_URL environment variable."
+  type        = string
+  default     = ""
+}
+
+variable "consumer_sa_name" {
+  description = "Name of the Kubernetes ServiceAccount for the async consumer Deployment. Must match the IRSA trust policy namespace_service_accounts entry."
+  type        = string
+  default     = "ticket-system-consumer"
+}
+
+variable "consumer_deployment_name" {
+  description = "Name of the Kubernetes Deployment for the async consumer worker. KEDA's ScaledObject references this name."
+  type        = string
+  default     = "ticket-system-consumer"
+}
+
+variable "polling_batch_size" {
+  description = "Maximum number of SQS messages the consumer retrieves per ReceiveMessage call. Passed to the consumer Deployment as POLLING_BATCH_SIZE."
+  type        = number
+  default     = 10
+}

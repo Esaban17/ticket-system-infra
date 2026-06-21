@@ -4,8 +4,8 @@ variable "environment" {
   default     = "dev"
 
   validation {
-    condition     = contains(["dev", "prod"], var.environment)
-    error_message = "environment must be either 'dev' or 'prod'."
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "environment must be 'dev', 'staging', or 'prod'."
   }
 }
 
@@ -148,4 +148,76 @@ variable "eks_node_max_size" {
   description = "Upper bound for the EKS managed node group."
   type        = number
   default     = 2
+}
+
+# ---- Async messaging (SQS) — Delivery 4, Deliverable A ----------------------
+
+variable "sqs_max_receive_count" {
+  description = "Number of times a message can be received from the SQS queue before being moved to the DLQ. 3 attempts provides two retries before dead-lettering."
+  type        = number
+  default     = 3
+}
+
+variable "sqs_visibility_timeout_seconds" {
+  description = "Seconds a received SQS message remains invisible to other consumers. Must exceed the consumer's maximum processing time to avoid duplicate delivery."
+  type        = number
+  default     = 60
+}
+
+variable "sqs_message_retention_seconds" {
+  description = "Seconds SQS retains messages in the main queue before discarding them."
+  type        = number
+  default     = 345600
+}
+
+variable "sqs_dlq_retention_seconds" {
+  description = "Seconds SQS retains dead-lettered messages. 14 days gives operators time to inspect and replay failed messages."
+  type        = number
+  default     = 1209600
+}
+
+variable "consumer_polling_batch_size" {
+  description = "Maximum number of messages the consumer worker retrieves per SQS ReceiveMessage call. Drives the POLLING_BATCH_SIZE env var in the consumer Deployment."
+  type        = number
+  default     = 10
+}
+
+# ---- KEDA (EKS autoscaling) — Delivery 4, Deliverable F --------------------
+
+variable "keda_version" {
+  description = "Version of the KEDA Helm chart to install in the EKS cluster. Pin this to avoid unexpected behavior changes from auto-upgrades."
+  type        = string
+  default     = "2.15.1"
+}
+
+variable "keda_min_replica_count" {
+  description = "Minimum number of consumer pod replicas KEDA will maintain. 0 allows full scale-down when the queue is empty (cost optimization)."
+  type        = number
+  default     = 0
+}
+
+variable "keda_max_replica_count" {
+  description = "Maximum number of consumer pod replicas KEDA will scale up to."
+  type        = number
+  default     = 5
+}
+
+variable "keda_queue_length_trigger" {
+  description = "Target number of SQS messages per consumer pod replica. KEDA computes desired_replicas = queue_depth / queue_length_trigger."
+  type        = number
+  default     = 5
+}
+
+# ---- EventBridge Scheduler — Delivery 4, Deliverable C ---------------------
+
+variable "scheduler_expression" {
+  description = "Rate or cron expression for the EventBridge Scheduler that invokes the report-generator Lambda (e.g. 'rate(1 day)')."
+  type        = string
+  default     = "rate(1 day)"
+}
+
+variable "scheduler_timezone" {
+  description = "IANA timezone for the EventBridge Scheduler schedule expression."
+  type        = string
+  default     = "UTC"
 }

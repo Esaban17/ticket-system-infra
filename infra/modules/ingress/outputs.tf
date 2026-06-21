@@ -21,3 +21,8 @@ output "namespace" {
   description = "Namespace the application is deployed into."
   value       = kubernetes_namespace.this.metadata[0].name
 }
+
+output "consumer_role_arn" {
+  description = "ARN of the consumer IRSA role (least-privilege SQS + S3 access). Empty when sqs_queue_arn is not set."
+  value       = length(module.consumer_irsa) > 0 ? module.consumer_irsa[0].iam_role_arn : ""
+}

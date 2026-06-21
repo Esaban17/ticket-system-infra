@@ -147,3 +147,54 @@ output "ingress_hostname" {
   description = "DNS hostname of the ALB created by the Kubernetes Ingress."
   value       = module.ingress.ingress_hostname
 }
+
+# ---- Async Messaging (Delivery 4 — Deliverable A) -------------------------
+
+output "sqs_queue_url" {
+  description = "URL of the main SQS queue. Used by the producer (POST /v1/notifications/enqueue) and the consumer Deployment (SQS_QUEUE_URL env var)."
+  value       = module.async.queue_url
+}
+
+output "sqs_queue_arn" {
+  description = "ARN of the main SQS queue. Referenced in IAM policies (producer IRSA: sqs:SendMessage; consumer IRSA: sqs:ReceiveMessage/DeleteMessage/GetQueueAttributes)."
+  value       = module.async.queue_arn
+}
+
+output "sqs_queue_name" {
+  description = "Name of the main SQS queue."
+  value       = module.async.queue_name
+}
+
+output "sqs_dlq_url" {
+  description = "URL of the dead-letter queue. Used by operators to inspect and replay messages that failed after maxReceiveCount delivery attempts."
+  value       = module.async.dlq_url
+}
+
+output "sqs_dlq_arn" {
+  description = "ARN of the dead-letter queue."
+  value       = module.async.dlq_arn
+}
+
+# ---- Scheduler (Delivery 4 — Deliverable C) --------------------------------
+
+output "scheduler_arn" {
+  description = "ARN of the EventBridge Scheduler schedule that invokes the report-generator Lambda."
+  value       = module.scheduler.schedule_arn
+}
+
+output "scheduler_role_arn" {
+  description = "ARN of the dedicated IAM role used by EventBridge Scheduler (lambda:InvokeFunction on the report-generator ARN only)."
+  value       = module.scheduler.scheduler_role_arn
+}
+
+# ---- KEDA (Delivery 4 — Deliverable F) ------------------------------------
+
+output "keda_irsa_role_arn" {
+  description = "ARN of the IRSA role attached to the KEDA keda-operator ServiceAccount (sqs:GetQueueAttributes on the async queue)."
+  value       = module.keda.keda_irsa_role_arn
+}
+
+output "consumer_role_arn" {
+  description = "ARN of the consumer pod IRSA role (sqs:ReceiveMessage/DeleteMessage/GetQueueAttributes + s3:PutObject)."
+  value       = module.ingress.consumer_role_arn
+}
