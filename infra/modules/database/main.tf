@@ -66,7 +66,7 @@ resource "aws_db_instance" "this" {
   vpc_security_group_ids = var.security_group_ids
   multi_az               = var.multi_az
   publicly_accessible    = false
-  skip_final_snapshot    = var.environment == "dev"
+  skip_final_snapshot    = var.environment != "prod"
   deletion_protection    = var.deletion_protection
   apply_immediately      = var.environment == "dev"
 }
