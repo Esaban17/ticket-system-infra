@@ -65,7 +65,7 @@ jobs:
           terraform_version: "~> 1.8"
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -backend-config=envs/dev/backend-dev.hcl
         working-directory: infra/
 
       # Garantiza que el repositorio ECR ticket-system-web exista antes de
