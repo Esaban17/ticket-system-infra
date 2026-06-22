@@ -30,3 +30,9 @@ keda_max_replica_count = 3
 # Scheduler
 scheduler_expression = "rate(1 day)"
 scheduler_timezone   = "UTC"
+
+# Image tag — pinned to the same API image used in dev (same ECR repo).
+# The web ECR (registry_web) is empty in staging; the web pod will stay
+# in ImagePullBackOff, which is acceptable: staging evidence targets the
+# CD pipeline gate and the async stack, not the web frontend.
+api_image_tag = "c8d1d66"
