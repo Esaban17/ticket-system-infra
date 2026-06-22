@@ -80,13 +80,12 @@ resource "aws_iam_role_policy" "lambda_logs" {
 }
 
 # ---- S3 permissions (Delivery 4 — report generator) -------------------------
-# The report-generator Lambda lists async objects and writes summary reports to
-# the S3 bucket. Scoped to the SPECIFIC bucket ARN (no wildcard resources).
-# Only added when var.bucket_arn is provided; a null/empty value disables this
-# policy (backward-compatible with deployments that don't pass a bucket).
+# Only created when enable_s3_access = true. Using a plain bool (not derived
+# from bucket_arn) prevents Terraform "count depends on apply-time value"
+# errors on cold-start applies where module.storage hasn't been created yet.
 
 data "aws_iam_policy_document" "lambda_s3" {
-  count = var.bucket_arn != "" ? 1 : 0
+  count = var.enable_s3_access ? 1 : 0
 
   statement {
     sid       = "AllowLambdaToListBucket"
@@ -104,7 +103,7 @@ data "aws_iam_policy_document" "lambda_s3" {
 }
 
 resource "aws_iam_role_policy" "lambda_s3" {
-  count  = var.bucket_arn != "" ? 1 : 0
+  count  = var.enable_s3_access ? 1 : 0
   name   = "${local.function_name}-s3"
   role   = aws_iam_role.lambda_exec.id
   policy = data.aws_iam_policy_document.lambda_s3[0].json

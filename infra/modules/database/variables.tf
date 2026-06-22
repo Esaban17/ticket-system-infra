@@ -1,10 +1,10 @@
 variable "environment" {
-  description = "Deployment environment (dev, prod). Used in resource naming and to relax destruction protections in dev."
+  description = "Deployment environment (dev, staging, prod). Used in resource naming and to relax destruction protections in dev."
   type        = string
 
   validation {
-    condition     = contains(["dev", "prod"], var.environment)
-    error_message = "environment must be either 'dev' or 'prod'."
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "environment must be 'dev', 'staging', or 'prod'."
   }
 }
 

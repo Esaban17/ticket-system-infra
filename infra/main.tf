@@ -80,8 +80,11 @@ module "compute" {
   subnet_ids      = module.network.private_subnet_ids
 
   # D4: pass bucket so the Lambda can list and write S3 objects.
-  bucket_name = module.storage.bucket_id
-  bucket_arn  = module.storage.bucket_arn
+  # enable_s3_access uses a static bool (not derived from module.storage)
+  # to avoid "count depends on apply-time value" on cold-start applies.
+  bucket_name      = module.storage.bucket_id
+  bucket_arn       = module.storage.bucket_arn
+  enable_s3_access = true
 }
 
 # ---- Database (RDS PostgreSQL) -------------------------------------------
