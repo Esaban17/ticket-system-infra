@@ -34,7 +34,7 @@ data "aws_iam_policy_document" "scheduler_assume_role" {
 resource "aws_iam_role" "scheduler" {
   name               = "${var.name}-role"
   assume_role_policy = data.aws_iam_policy_document.scheduler_assume_role.json
-  description        = "Least-privilege role for EventBridge Scheduler '${var.name}' — only lambda:InvokeFunction on the target ARN."
+  description        = "Least-privilege role for EventBridge Scheduler '${var.name}' - only lambda:InvokeFunction on the target ARN."
 }
 
 # Inline policy: only InvokeFunction on the SPECIFIC target Lambda ARN.

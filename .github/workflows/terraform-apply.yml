@@ -77,6 +77,17 @@ jobs:
           path: infra/tfplan
           retention-days: 1
 
+      # data.archive_file.lambda creates the Lambda ZIP during terraform plan
+      # (data sources are evaluated at plan time). The apply runner is a fresh
+      # machine with no build/ directory, so we ship the ZIP as a second
+      # artifact that apply-dev downloads before running terraform apply.
+      - name: Upload Lambda package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-build-${{ github.run_id }}
+          path: infra/modules/compute/build/
+          retention-days: 1
+
   # --------------------------------------------------------------------------
   # Job 2: apply-dev
   # Download the tfplan artifact and apply it without re-planning.
@@ -125,6 +136,15 @@ jobs:
           name: tfplan-dev-${{ github.run_id }}
           path: infra/
 
+      # Restore the Lambda ZIP built by archive_file during plan-dev.
+      # Without this, aws_lambda_function fails with "no such file or directory"
+      # because the apply runner starts from a clean checkout.
+      - name: Download Lambda package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-build-${{ github.run_id }}
+          path: infra/modules/compute/build/
+
       - name: Apply plan (dev)
         run: terraform apply tfplan
         working-directory: infra/
@@ -139,6 +159,10 @@ jobs:
   # exist yet, so the Kubernetes/Helm provider can't connect during a full
   # plan. Phase 1 creates the AWS infra (incl. EKS); Phase 2 creates the
   # in-cluster resources once the cluster endpoint is reachable.
+  #
+  # No Lambda ZIP artifact needed for staging: the two-phase apply runs plan
+  # and apply in the same runner session, so archive_file creates the ZIP
+  # during the inline plan and aws_lambda_function reads it in the same apply.
   # --------------------------------------------------------------------------
   apply-staging:
     name: Apply (staging)
