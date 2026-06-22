@@ -58,7 +58,7 @@ module "storage" {
 
   environment   = var.environment
   bucket_name   = "${var.project_name}-${var.environment}-attachments-${var.tickets_bucket_suffix}"
-  force_destroy = var.environment == "dev"
+  force_destroy = var.environment != "prod"
 }
 
 # ---- Compute (Lambda report-generator) -------------------------------------
