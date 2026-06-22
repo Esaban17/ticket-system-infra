@@ -1,0 +1,38 @@
+=== Delivery 4 — E2E Async Proof ===
+Captured: 2026-06-22T04:04:30Z
+ALB: http://k8s-ticketsy-ticketsy-0187f58f9a-757327104.us-east-1.elb.amazonaws.com
+
+=== Step 1: Login ===
+POST http://k8s-ticketsy-ticketsy-0187f58f9a-757327104.us-east-1.elb.amazonaws.com/v1/auth/login -> 200 OK (token obtained)
+User: admin@ticket-system.dev (role: administrador)
+
+=== Step 2: Enqueue async notification ===
+POST http://k8s-ticketsy-ticketsy-0187f58f9a-757327104.us-east-1.elb.amazonaws.com/v1/notifications/enqueue
+{"status":"accepted","messageId":"b5b5b994-3b39-47d6-adc5-0cb78ca8279f"}
+
+HTTP_STATUS: 202
+
+=== Step 3: Consumer log — message_processed ===
+{"event":"consumer_started","queueUrl":"https://sqs.us-east-1.amazonaws.com/203036352580/ticket-system-dev-async-main","bucket":"ticket-system-dev-attachments-galileo-pdds","region":"us-east-1","batchSize":10}
+(node:1) Warning: NodeVersionSupportWarning: The AWS SDK for JavaScript (v3)
+versions published after the first week of January 2027
+will require node >=22. You are running node v20.20.2.
+
+To continue receiving updates to AWS services, bug fixes,
+and security updates please upgrade to node >=22.
+
+More information can be found at: https://a.co/c895JFp
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"event":"message_processed","messageId":"b5b5b994-3b39-47d6-adc5-0cb78ca8279f","s3Key":"async/b5b5b994-3b39-47d6-adc5-0cb78ca8279f","bucket":"ticket-system-dev-attachments-galileo-pdds"}
+
+=== Step 4: S3 object created under async/ prefix ===
+2026-06-21 22:04:56        106 b5b5b994-3b39-47d6-adc5-0cb78ca8279f
+
+=== S3 object content ===
+{"event":"ticket_creado","ticketId":"00000000-0000-0000-0000-000000000001","source":"d4-evidence-capture"}
+=== E2E Async Proof Summary ===
+  POST /v1/notifications/enqueue → HTTP 202
+  MessageId: b5b5b994-3b39-47d6-adc5-0cb78ca8279f
+  Consumer: message_processed (KEDA scaled from 0 → 1)
+  SQS queue depth after processing: 0
+  S3 object: s3://ticket-system-dev-attachments-galileo-pdds/async/b5b5b994-3b39-47d6-adc5-0cb78ca8279f

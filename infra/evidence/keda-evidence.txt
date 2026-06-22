@@ -1,0 +1,82 @@
+=== Delivery 4 — KEDA / Consumer Evidence ===
+Captured: 2026-06-22T04:03:26Z
+
+=== kubectl get scaledobject -A ===
+NAMESPACE       NAME                                  SCALETARGETKIND      SCALETARGETNAME          MIN   MAX   TRIGGERS        AUTHENTICATION   READY   ACTIVE   FALLBACK   PAUSED    AGE
+ticket-system   ticket-system-consumer-scaledobject   apps/v1.Deployment   ticket-system-consumer   0     5     aws-sqs-queue                    True    False    False      Unknown   101m
+
+=== kubectl describe scaledobject -n ticket-system ===
+Name:         ticket-system-consumer-scaledobject
+Namespace:    ticket-system
+Labels:       app.kubernetes.io/managed-by=terraform
+              scaledobject.keda.sh/name=ticket-system-consumer-scaledobject
+Annotations:  <none>
+API Version:  keda.sh/v1alpha1
+Kind:         ScaledObject
+Metadata:
+  Creation Timestamp:  2026-06-22T02:21:52Z
+  Finalizers:
+    finalizer.keda.sh
+  Generation:        1
+  Resource Version:  1584744
+  UID:               17ad0fb7-a84d-42a7-8766-d45693f61710
+Spec:
+  Max Replica Count:  5
+  Min Replica Count:  0
+  Scale Target Ref:
+    Name:  ticket-system-consumer
+  Triggers:
+    Metadata:
+      Aws Region:      us-east-1
+      Identity Owner:  operator
+      Queue Length:    5
+      Queue URL:       https://sqs.us-east-1.amazonaws.com/203036352580/ticket-system-dev-async-main
+    Type:              aws-sqs-queue
+Status:
+  Conditions:
+    Message:  ScaledObject is defined correctly and is ready for scaling
+    Reason:   ScaledObjectReady
+    Status:   True
+    Type:     Ready
+    Message:  Scaling is not performed because triggers are not active
+    Reason:   ScalerNotActive
+    Status:   False
+    Type:     Active
+    Message:  No fallbacks are active on this scaled object
+    Reason:   NoFallbackFound
+    Status:   False
+    Type:     Fallback
+    Status:   Unknown
+    Type:     Paused
+  External Metric Names:
+    s0-aws-sqs-ticket-system-dev-async-main
+  Health:
+    s0-aws-sqs-ticket-system-dev-async-main:
+      Number Of Failures:  0
+      Status:              Happy
+  Hpa Name:                keda-hpa-ticket-system-consumer-scaledobject
+  Original Replica Count:  1
+  Scale Target GVKR:
+    Group:            apps
+    Kind:             Deployment
+    Resource:         deployments
+    Version:          v1
+  Scale Target Kind:  apps/v1.Deployment
+Events:
+  Type    Reason                      Age                 From           Message
+  ----    ------                      ----                ----           -------
+  Normal  KEDAScaleTargetDeactivated  29m (x4 over 101m)  keda-operator  Deactivated apps/v1.Deployment ticket-system/ticket-system-consumer from 1 to 0
+
+=== kubectl get hpa -A ===
+NAMESPACE       NAME                                           REFERENCE                           TARGETS             MINPODS   MAXPODS   REPLICAS   AGE
+ticket-system   keda-hpa-ticket-system-consumer-scaledobject   Deployment/ticket-system-consumer   <unknown>/5 (avg)   1         5         0          101m
+
+=== kubectl get deployment ticket-system-consumer -n ticket-system ===
+NAME                     READY   UP-TO-DATE   AVAILABLE   AGE    CONTAINERS   IMAGES                                                                   SELECTOR
+ticket-system-consumer   0/0     0            0           102m   consumer     203036352580.dkr.ecr.us-east-1.amazonaws.com/ticket-system-api:c8d1d66   app.kubernetes.io/component=consumer,app.kubernetes.io/managed-by=terraform,app.kubernetes.io/name=ticket-system
+
+=== KEDA IRSA role ARN ===
+"arn:aws:iam::203036352580:role/ticket-system-dev-eks-keda-operator"
+
+=== Consumer role ARN ===
+"arn:aws:iam::203036352580:role/ticket-system-dev-eks-consumer"

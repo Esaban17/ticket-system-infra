@@ -67,3 +67,57 @@ Screenshots a capturar manualmente (el script imprime qué debe mostrar cada uno
 `security-groups.png`, `ingress-healthy.png`, `e2e-storage.png`, `ci-plan.png`,
 `eks-nodes-d3.png`. Todos se renderizan en `infra/README.md` bajo
 `## Evidence — Delivery 3` y deben existir en el commit del tag `oyd-delivery-3`.
+
+---
+
+# Evidence — Delivery 4 (Async Infrastructure & Full CD Pipeline)
+
+Los artefactos de texto se generaron con
+[`capture-delivery-4.sh`](./capture-delivery-4.sh) + AWS CLI + kubectl,
+corriendo desde `infra/` con el backend dev inicializado y el cluster dev activo.
+
+## Artefactos de texto (5)
+
+| Archivo | Deliverable | Contenido |
+|---|---|---|
+| `async-foundation.txt` | A — Async Messaging | `terraform output` (SQS URLs/ARNs/DLQ) + `aws sqs get-queue-attributes` con RedrivePolicy |
+| `event-source-plan.txt` | B — Event-Driven Compute | `terraform state show` para SQS queue, consumer IRSA + `kubectl describe deploy` |
+| `scheduler-plan.txt` | C — Scheduled Jobs | `terraform state show` para `aws_scheduler_schedule` + IAM role + `aws scheduler get-schedule` |
+| `async-enqueue.txt` | E — E2E Async Proof | `curl POST /v1/notifications/enqueue → 202 + MessageId` + consumer logs + S3 object listing |
+| `keda-evidence.txt` | F — KEDA EKS Integration | `kubectl get/describe scaledobject + hpa + deployment` |
+
+## Artefactos visuales (13 PNG)
+
+| Archivo | Deliverable | Qué muestra |
+|---|---|---|
+| `github-environments.png` | D — CD Pipeline | Environments `dev` (auto) y `staging` (reviewer gate) |
+| `ruleset-config.png` | D — CD Pipeline | Branch ruleset `main`: deletion/non-fast-forward/required-status-checks/pull-request |
+| `ruleset-blocked-merge.png` | D — CD Pipeline | PR abierto con merge bloqueado por el ruleset |
+| `ci-apply-dev.png` | D — CD Pipeline | Job `Apply (dev)` — descarga de artifact tfplan + apply exitoso |
+| `ci-apply-staging.png` | D — CD Pipeline | Run overview: jobs Plan→Apply(dev)→Apply(staging), gate approval y artifacts |
+| `ci-drift.png` | D — CD Pipeline | Drift Detection run exitoso (no drift detectado) |
+| `ci-destroy.png` | D — CD Pipeline | Destroy staging workflow_dispatch con gate aprobado |
+| `scheduler.png` | C — Scheduled Jobs | AWS EventBridge Scheduler: `rate(1 day)` → Lambda worker, estado ENABLED |
+| `async-object.png` | E — E2E Async Proof | S3 bucket `async/` con el objeto `b5b5b994-…` escrito por el consumer |
+| `event-source.png` | B — Event-Driven Compute | `kubectl describe deploy ticket-system-consumer` — KEDA scale events |
+| `keda-scaled-object.png` | F — KEDA EKS Integration | `kubectl describe scaledobject` — READY=True, trigger aws-sqs-queue |
+| `keda-hpa.png` | F — KEDA EKS Integration | `kubectl get hpa -A` — HPA creado por KEDA |
+| `async-consumer.png` | E — E2E Async Proof | Logs del consumer: `consumer_started` → `message_processed` → S3 key |
+
+## Reproducibilidad
+
+```bash
+# Desde infra/ con backend dev inicializado y kubeconfig actualizado:
+aws eks update-kubeconfig --name ticket-system-dev-eks --region us-east-1
+export TF_VAR_db_password='<password>'
+bash evidence/capture-delivery-4.sh
+
+# E2E (requiere ALB activo):
+export E2E_JWT_TOKEN=$(curl -s -X POST http://<alb>/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@ticket-system.dev","password":"any"}' | jq -r .token)
+bash evidence/capture-delivery-4.sh  # re-corre con el token
+```
+
+Todos los artefactos se renderizan en `infra/README.md` bajo
+`## Evidence — Delivery 4` y deben existir en el commit del tag `oyd-delivery-4`.

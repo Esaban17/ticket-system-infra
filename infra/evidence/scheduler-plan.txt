@@ -1,0 +1,123 @@
+=== Delivery 4 — Scheduler Evidence ===
+Captured: 2026-06-22T04:06:34Z
+
+=== terraform state: EventBridge Scheduler ===
+# module.scheduler.aws_scheduler_schedule.this:
+resource "aws_scheduler_schedule" "this" {
+    arn                          = "arn:aws:scheduler:us-east-1:203036352580:schedule/default/ticket-system-dev-report-scheduler"
+    description                  = null
+    end_date                     = null
+    group_name                   = "default"
+    id                           = "default/ticket-system-dev-report-scheduler"
+    kms_key_arn                  = null
+    name                         = "ticket-system-dev-report-scheduler"
+    name_prefix                  = null
+    schedule_expression          = "rate(1 day)"
+    schedule_expression_timezone = "UTC"
+    start_date                   = null
+    state                        = "ENABLED"
+
+    flexible_time_window {
+        maximum_window_in_minutes = 0
+        mode                      = "OFF"
+    }
+
+    target {
+        arn      = "arn:aws:lambda:us-east-1:203036352580:function:ticket-system-dev-worker"
+        input    = null
+        role_arn = "arn:aws:iam::203036352580:role/ticket-system-dev-report-scheduler-role"
+
+        retry_policy {
+            maximum_event_age_in_seconds = 86400
+            maximum_retry_attempts       = 185
+        }
+    }
+}
+
+=== terraform state: Scheduler IAM role ===
+# module.scheduler.aws_iam_role.scheduler:
+resource "aws_iam_role" "scheduler" {
+    arn                   = "arn:aws:iam::203036352580:role/ticket-system-dev-report-scheduler-role"
+    assume_role_policy    = jsonencode(
+        {
+            Statement = [
+                {
+                    Action    = "sts:AssumeRole"
+                    Effect    = "Allow"
+                    Principal = {
+                        Service = "scheduler.amazonaws.com"
+                    }
+                    Sid       = "AllowSchedulerToAssume"
+                },
+            ]
+            Version   = "2012-10-17"
+        }
+    )
+    create_date           = "2026-06-22T02:31:40Z"
+    description           = "Least-privilege role for EventBridge Scheduler 'ticket-system-dev-report-scheduler' - only lambda:InvokeFunction on the target ARN."
+    force_detach_policies = false
+    id                    = "ticket-system-dev-report-scheduler-role"
+    managed_policy_arns   = []
+    max_session_duration  = 3600
+    name                  = "ticket-system-dev-report-scheduler-role"
+    name_prefix           = null
+    path                  = "/"
+    permissions_boundary  = null
+    tags                  = {}
+    tags_all              = {
+        "Environment" = "dev"
+        "ManagedBy"   = "terraform"
+        "Project"     = "ticket-system"
+    }
+    unique_id             = "AROAS6RPI4BCCKECNWWDU"
+
+    inline_policy {
+        name   = "ticket-system-dev-report-scheduler-invoke"
+        policy = jsonencode(
+            {
+                Statement = [
+                    {
+                        Action   = "lambda:InvokeFunction"
+                        Effect   = "Allow"
+                        Resource = "arn:aws:lambda:us-east-1:203036352580:function:ticket-system-dev-worker"
+                        Sid      = "AllowInvokeTargetLambda"
+                    },
+                ]
+                Version   = "2012-10-17"
+            }
+        )
+    }
+}
+
+=== aws scheduler describe ===
+{
+    "ActionAfterCompletion": "NONE",
+    "Arn": "arn:aws:scheduler:us-east-1:203036352580:schedule/default/ticket-system-dev-report-scheduler",
+    "CreationDate": "2026-06-21T20:35:26.050000-06:00",
+    "FlexibleTimeWindow": {
+        "Mode": "OFF"
+    },
+    "GroupName": "default",
+    "LastModificationDate": "2026-06-21T20:35:26.050000-06:00",
+    "Name": "ticket-system-dev-report-scheduler",
+    "ScheduleExpression": "rate(1 day)",
+    "ScheduleExpressionTimezone": "UTC",
+    "State": "ENABLED",
+    "Target": {
+        "Arn": "arn:aws:lambda:us-east-1:203036352580:function:ticket-system-dev-worker",
+        "RetryPolicy": {
+            "MaximumEventAgeInSeconds": 86400,
+            "MaximumRetryAttempts": 185
+        },
+        "RoleArn": "arn:aws:iam::203036352580:role/ticket-system-dev-report-scheduler-role"
+    }
+}
+
+=== Lambda worker function ===
+{
+    "FunctionArn": "arn:aws:lambda:us-east-1:203036352580:function:ticket-system-dev-worker",
+    "Runtime": "python3.12",
+    "Handler": "index.handler",
+    "State": "Active",
+    "LastModified": "2026-06-22T02:31:41.127+0000"
+}
