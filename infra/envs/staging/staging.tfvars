@@ -31,6 +31,13 @@ keda_max_replica_count = 3
 scheduler_expression = "rate(1 day)"
 scheduler_timezone   = "UTC"
 
+# ECR — staging reuses dev's ECR repositories (ticket-system-api,
+# ticket-system-web). ECR repository names have no environment segment so
+# dev and staging share the same repos in the same AWS account. Setting
+# create_ecr_repositories = false makes the registry module read the existing
+# repos via a data source instead of trying to create duplicates.
+create_ecr_repositories = false
+
 # Image tag — pinned to the same API image used in dev (same ECR repo).
 # The web ECR (registry_web) is empty in staging; the web pod will stay
 # in ImagePullBackOff, which is acceptable: staging evidence targets the

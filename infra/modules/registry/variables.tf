@@ -1,10 +1,10 @@
 variable "env" {
-  description = "Deployment environment (dev, prod). Surfaced as a resource tag and available for naming decisions inside the module."
+  description = "Deployment environment (dev, staging, prod). Surfaced as a resource tag and available for naming decisions inside the module."
   type        = string
 
   validation {
-    condition     = contains(["dev", "prod"], var.env)
-    error_message = "env must be either 'dev' or 'prod'."
+    condition     = contains(["dev", "staging", "prod"], var.env)
+    error_message = "env must be 'dev', 'staging', or 'prod'."
   }
 }
 
@@ -18,6 +18,12 @@ variable "repository_name" {
   description = "Name of the ECR repository. BL-101 mandates 'ticket-system-api'; exposed as a variable so the module remains reusable for a future second image (e.g. worker) without copy-paste."
   type        = string
   default     = "ticket-system-api"
+}
+
+variable "create_repository" {
+  description = "When true (default), create and manage the ECR repository as a Terraform resource. Set to false in staging so the module reads the repository created by dev via a data source instead of trying to create a duplicate (ECR repository names are account-scoped, not environment-scoped)."
+  type        = bool
+  default     = true
 }
 
 variable "tags" {

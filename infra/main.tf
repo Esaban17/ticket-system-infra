@@ -109,13 +109,16 @@ module "database" {
 # ---- Registry (ECR for the API container image) --------------------------
 # Provisioned ahead of BL-102 (Dockerfile + initial push) so the image URL
 # is available as a stable terraform output before any container work begins.
+# create_repository = false in staging: ECR repo names have no environment
+# segment, so staging reads the repo created by dev via a data source.
 
 module "registry" {
   source = "./modules/registry"
 
-  env             = var.environment
-  name_prefix     = var.project_name
-  repository_name = "${var.project_name}-api"
+  env               = var.environment
+  name_prefix       = var.project_name
+  repository_name   = "${var.project_name}-api"
+  create_repository = var.create_ecr_repositories
 }
 
 # ---- Registry (ECR for the web frontend image) ---------------------------
@@ -126,9 +129,10 @@ module "registry" {
 module "registry_web" {
   source = "./modules/registry"
 
-  env             = var.environment
-  name_prefix     = var.project_name
-  repository_name = "${var.project_name}-web"
+  env               = var.environment
+  name_prefix       = var.project_name
+  repository_name   = "${var.project_name}-web"
+  create_repository = var.create_ecr_repositories
 }
 
 # ---- EKS (Optional Track 1 + Deliverable F) ------------------------------

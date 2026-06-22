@@ -12,9 +12,18 @@
 # Lives in its own module instead of being added to compute/ because compute/
 # currently provisions the Lambda worker; mixing a container registry with a
 # Lambda function would muddle the module boundary.
+#
+# create_repository = true  (default) — dev: create and manage the ECR repo.
+# create_repository = false            — staging: read the existing repo via a
+#   data source. Staging reuses the same images as dev (same account/region).
+#   A data source ensures staging never manages — and can never destroy — the
+#   shared repo (a terraform destroy of staging with force_delete=true would
+#   otherwise wipe dev's images).
 # ---------------------------------------------------------------------------
 
 resource "aws_ecr_repository" "this" {
+  count = var.create_repository ? 1 : 0
+
   name                 = var.repository_name
   image_tag_mutability = "IMMUTABLE"
 
@@ -41,14 +50,21 @@ resource "aws_ecr_repository" "this" {
   )
 }
 
+# Read-only path: staging resolves the pre-existing repo created by dev.
+data "aws_ecr_repository" "existing" {
+  count = var.create_repository ? 0 : 1
+  name  = var.repository_name
+}
+
 # ---- Lifecycle policy ----------------------------------------------------
 # Rules are evaluated in ascending rulePriority order. We expire untagged
 # images first (priority 1) because that rule is cheap to evaluate, then cap
-# the number of tagged images (priority 2). The tagPrefixList of [""] matches
+# the number of tagged images (priority 2). The tagPrefixList of ["*"] matches
 # any tagged image regardless of prefix.
 
 resource "aws_ecr_lifecycle_policy" "this" {
-  repository = aws_ecr_repository.this.name
+  count      = var.create_repository ? 1 : 0
+  repository = aws_ecr_repository.this[0].name
 
   policy = jsonencode({
     rules = [
@@ -80,4 +96,21 @@ resource "aws_ecr_lifecycle_policy" "this" {
       },
     ]
   })
+}
+
+# ---- State migration (dev only, no-op in staging) ------------------------
+# Introducing count = 1 on pre-existing resources would force a destroy +
+# recreate without these moved blocks (Terraform sees the unindexed address
+# as deleted and the indexed one as new). The moved blocks instruct Terraform
+# to rename the state address without making any AWS API calls. In staging
+# (fresh empty state) these blocks are no-ops.
+
+moved {
+  from = aws_ecr_repository.this
+  to   = aws_ecr_repository.this[0]
+}
+
+moved {
+  from = aws_ecr_lifecycle_policy.this
+  to   = aws_ecr_lifecycle_policy.this[0]
 }
