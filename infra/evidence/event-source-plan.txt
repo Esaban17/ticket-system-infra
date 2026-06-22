@@ -1,0 +1,162 @@
+=== Delivery 4 — Event Source (Consumer IRSA + SQS) Evidence ===
+Captured: 2026-06-22T04:06:22Z
+
+=== terraform state: SQS main queue ===
+# module.async.aws_sqs_queue.main:
+resource "aws_sqs_queue" "main" {
+    arn                               = "arn:aws:sqs:us-east-1:203036352580:ticket-system-dev-async-main"
+    content_based_deduplication       = false
+    deduplication_scope               = null
+    delay_seconds                     = 0
+    fifo_queue                        = false
+    fifo_throughput_limit             = null
+    id                                = "https://sqs.us-east-1.amazonaws.com/203036352580/ticket-system-dev-async-main"
+    kms_data_key_reuse_period_seconds = 300
+    kms_master_key_id                 = null
+    max_message_size                  = 262144
+    message_retention_seconds         = 345600
+    name                              = "ticket-system-dev-async-main"
+    name_prefix                       = null
+    policy                            = null
+    receive_wait_time_seconds         = 0
+    redrive_allow_policy              = null
+    redrive_policy                    = jsonencode(
+        {
+            deadLetterTargetArn = "arn:aws:sqs:us-east-1:203036352580:ticket-system-dev-async-dlq"
+            maxReceiveCount     = 3
+        }
+    )
+    sqs_managed_sse_enabled           = true
+    tags                              = {}
+    tags_all                          = {
+        "Environment" = "dev"
+        "ManagedBy"   = "terraform"
+        "Project"     = "ticket-system"
+    }
+    url                               = "https://sqs.us-east-1.amazonaws.com/203036352580/ticket-system-dev-async-main"
+    visibility_timeout_seconds        = 60
+}
+
+=== terraform state: SQS DLQ ===
+# module.async.aws_sqs_queue.dlq:
+resource "aws_sqs_queue" "dlq" {
+    arn                               = "arn:aws:sqs:us-east-1:203036352580:ticket-system-dev-async-dlq"
+    content_based_deduplication       = false
+    deduplication_scope               = null
+    delay_seconds                     = 0
+    fifo_queue                        = false
+    fifo_throughput_limit             = null
+    id                                = "https://sqs.us-east-1.amazonaws.com/203036352580/ticket-system-dev-async-dlq"
+    kms_data_key_reuse_period_seconds = 300
+    kms_master_key_id                 = null
+    max_message_size                  = 262144
+    message_retention_seconds         = 1209600
+    name                              = "ticket-system-dev-async-dlq"
+    name_prefix                       = null
+    policy                            = null
+    receive_wait_time_seconds         = 0
+    redrive_allow_policy              = null
+    redrive_policy                    = null
+    sqs_managed_sse_enabled           = true
+    tags                              = {}
+    tags_all                          = {
+        "Environment" = "dev"
+        "ManagedBy"   = "terraform"
+        "Project"     = "ticket-system"
+    }
+    url                               = "https://sqs.us-east-1.amazonaws.com/203036352580/ticket-system-dev-async-dlq"
+    visibility_timeout_seconds        = 30
+}
+
+=== terraform state: consumer IRSA role ===
+# module.ingress.module.consumer_irsa[0].aws_iam_role.this[0]:
+resource "aws_iam_role" "this" {
+    arn                   = "arn:aws:iam::203036352580:role/ticket-system-dev-eks-consumer"
+    assume_role_policy    = jsonencode(
+        {
+            Statement = [
+                {
+                    Action    = "sts:AssumeRoleWithWebIdentity"
+                    Condition = {
+                        StringEquals = {
+                            "oidc.eks.us-east-1.amazonaws.com/id/BB4F82F1C0861E1518C1EA6DE1AC9005:aud" = "sts.amazonaws.com"
+                            "oidc.eks.us-east-1.amazonaws.com/id/BB4F82F1C0861E1518C1EA6DE1AC9005:sub" = "system:serviceaccount:ticket-system:ticket-system-consumer"
+                        }
+                    }
+                    Effect    = "Allow"
+                    Principal = {
+                        Federated = "arn:aws:iam::203036352580:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/BB4F82F1C0861E1518C1EA6DE1AC9005"
+                    }
+                },
+            ]
+            Version   = "2012-10-17"
+        }
+    )
+    create_date           = "2026-06-22T02:21:14Z"
+    description           = null
+    force_detach_policies = true
+    id                    = "ticket-system-dev-eks-consumer"
+    managed_policy_arns   = [
+        "arn:aws:iam::203036352580:policy/ticket-system-dev-eks-consumer-sqs-s3",
+    ]
+    max_session_duration  = 3600
+    name                  = "ticket-system-dev-eks-consumer"
+    name_prefix           = null
+    path                  = "/"
+    permissions_boundary  = null
+    tags                  = {}
+    tags_all              = {
+        "Environment" = "dev"
+        "ManagedBy"   = "terraform"
+        "Project"     = "ticket-system"
+    }
+    unique_id             = "AROAS6RPI4BCOMJTTA42B"
+}
+
+=== terraform state: consumer ServiceAccount ===
+
+=== kubectl consumer deployment ===
+NAME                     READY   UP-TO-DATE   AVAILABLE   AGE    CONTAINERS   IMAGES                                                                   SELECTOR
+ticket-system-consumer   1/1     1            1           105m   consumer     203036352580.dkr.ecr.us-east-1.amazonaws.com/ticket-system-api:c8d1d66   app.kubernetes.io/component=consumer,app.kubernetes.io/managed-by=terraform,app.kubernetes.io/name=ticket-system
+
+=== consumer deployment describe ===
+Name:                   ticket-system-consumer
+Namespace:              ticket-system
+CreationTimestamp:      Sun, 21 Jun 2026 20:21:16 -0600
+Labels:                 app.kubernetes.io/component=consumer
+                        app.kubernetes.io/managed-by=terraform
+                        app.kubernetes.io/name=ticket-system
+Annotations:            deployment.kubernetes.io/revision: 1
+Selector:               app.kubernetes.io/component=consumer,app.kubernetes.io/managed-by=terraform,app.kubernetes.io/name=ticket-system
+Replicas:               1 desired | 1 updated | 1 total | 1 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:           app.kubernetes.io/component=consumer
+                    app.kubernetes.io/managed-by=terraform
+                    app.kubernetes.io/name=ticket-system
+  Service Account:  ticket-system-consumer
+  Containers:
+   consumer:
+    Image:      203036352580.dkr.ecr.us-east-1.amazonaws.com/ticket-system-api:c8d1d66
+    Port:       <none>
+    Host Port:  <none>
+    Command:
+      node
+      dist/workers/async-consumer/main.js
+    Limits:
+      cpu:     250m
+      memory:  256Mi
+    Requests:
+      cpu:     100m
+      memory:  128Mi
+    Environment Variables from:
+      ticket-system-api-config  ConfigMap  Optional: false
+    Environment:
+      POLLING_BATCH_SIZE:  10
+    Mounts:                <none>
+  Volumes:                 <none>
+  Node-Selectors:          <none>
+  Tolerations:             <none>
+Conditions:

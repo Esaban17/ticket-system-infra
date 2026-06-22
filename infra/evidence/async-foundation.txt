@@ -1,0 +1,52 @@
+=== Delivery 4 — Async Foundation Evidence ===
+Captured: 2026-06-22T04:03:23Z
+
+=== terraform output (SQS / scheduler / KEDA) ===
+consumer_role_arn = "arn:aws:iam::203036352580:role/ticket-system-dev-eks-consumer"
+keda_irsa_role_arn = "arn:aws:iam::203036352580:role/ticket-system-dev-eks-keda-operator"
+scheduler_arn = "arn:aws:scheduler:us-east-1:203036352580:schedule/default/ticket-system-dev-report-scheduler"
+scheduler_role_arn = "arn:aws:iam::203036352580:role/ticket-system-dev-report-scheduler-role"
+sqs_dlq_arn = "arn:aws:sqs:us-east-1:203036352580:ticket-system-dev-async-dlq"
+sqs_dlq_url = "https://sqs.us-east-1.amazonaws.com/203036352580/ticket-system-dev-async-dlq"
+sqs_queue_arn = "arn:aws:sqs:us-east-1:203036352580:ticket-system-dev-async-main"
+sqs_queue_name = "ticket-system-dev-async-main"
+sqs_queue_url = "https://sqs.us-east-1.amazonaws.com/203036352580/ticket-system-dev-async-main"
+worker_lambda_arn = "arn:aws:lambda:us-east-1:203036352580:function:ticket-system-dev-worker"
+worker_lambda_name = "ticket-system-dev-worker"
+
+=== SQS main queue attributes ===
+{
+    "Attributes": {
+        "QueueArn": "arn:aws:sqs:us-east-1:203036352580:ticket-system-dev-async-main",
+        "ApproximateNumberOfMessages": "0",
+        "ApproximateNumberOfMessagesNotVisible": "0",
+        "ApproximateNumberOfMessagesDelayed": "0",
+        "CreatedTimestamp": "1782089934",
+        "LastModifiedTimestamp": "1782089934",
+        "VisibilityTimeout": "60",
+        "MaximumMessageSize": "262144",
+        "MessageRetentionPeriod": "345600",
+        "DelaySeconds": "0",
+        "RedrivePolicy": "{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:203036352580:ticket-system-dev-async-dlq\",\"maxReceiveCount\":3}",
+        "ReceiveMessageWaitTimeSeconds": "0",
+        "SqsManagedSseEnabled": "true"
+    }
+}
+
+=== SQS DLQ attributes ===
+{
+    "Attributes": {
+        "QueueArn": "arn:aws:sqs:us-east-1:203036352580:ticket-system-dev-async-dlq",
+        "ApproximateNumberOfMessages": "0",
+        "ApproximateNumberOfMessagesNotVisible": "0",
+        "ApproximateNumberOfMessagesDelayed": "0",
+        "CreatedTimestamp": "1782089908",
+        "LastModifiedTimestamp": "1782089908",
+        "VisibilityTimeout": "30",
+        "MaximumMessageSize": "262144",
+        "MessageRetentionPeriod": "1209600",
+        "DelaySeconds": "0",
+        "ReceiveMessageWaitTimeSeconds": "0",
+        "SqsManagedSseEnabled": "true"
+    }
+}
