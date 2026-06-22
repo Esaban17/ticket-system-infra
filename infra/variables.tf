@@ -106,6 +106,14 @@ variable "db_password" {
   }
 }
 
+# ---- ECR (container registries) ------------------------------------------
+
+variable "create_ecr_repositories" {
+  description = "When true (default), create and manage the ECR repositories for the API and web images. Set to false in staging: ECR repository names have no environment segment, so staging reuses the repos created by dev and reads them via data sources instead of recreating them."
+  type        = bool
+  default     = true
+}
+
 variable "api_image_tag" {
   description = "Tag of the ticket-system API container image (in ECR) deployed to EKS. The build step pushes this tag before the ingress module is applied."
   type        = string
