@@ -72,3 +72,9 @@ variable "bucket_arn" {
   type        = string
   default     = ""
 }
+
+variable "enable_s3_access" {
+  description = "Set to true to create the s3:ListBucket + s3:PutObject IAM policy for this Lambda. Decoupled from bucket_arn so the count is a static bool and not a computed value — prevents Terraform 'count depends on apply-time value' errors on cold-start applies."
+  type        = bool
+  default     = false
+}
