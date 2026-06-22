@@ -19,6 +19,15 @@ terraform {
       source  = "hashicorp/helm"
       version = "~> 2.13"
     }
+    # kubectl provider (alekc/kubectl) is used exclusively for the KEDA
+    # ScaledObject CRD instance. Unlike kubernetes_manifest, kubectl_manifest
+    # does NOT validate the CRD schema at plan time — validation is deferred to
+    # apply, when helm_release.keda has already installed the ScaledObject CRD.
+    # This lets terraform plan succeed before KEDA is deployed (ADR 0011).
+    kubectl = {
+      source  = "alekc/kubectl"
+      version = "~> 2.0"
+    }
     random = {
       source  = "hashicorp/random"
       version = "~> 3.5"
@@ -66,5 +75,16 @@ provider "helm" {
       command     = "aws"
       args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--region", var.region]
     }
+  }
+}
+
+provider "kubectl" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--region", var.region]
   }
 }

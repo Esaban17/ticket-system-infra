@@ -1,17 +1,15 @@
 name: Terraform Apply
 
 # Apply pipeline with plan-artifact promotion (ADR 0012):
-#   plan-dev    — plan dev (excluding ScaledObject; see note below), upload tfplan artifact
-#   apply-dev   — phase 1: download tfplan, apply it verbatim (GitHub Environment: dev, auto)
-#                 phase 2: apply ScaledObject with -target once KEDA CRDs are available
-#   apply-staging — three-phase cold-start apply (GitHub Environment: staging, gated reviewer)
+#   plan-dev    — plan dev, upload tfplan artifact
+#   apply-dev   — download tfplan, apply it verbatim (GitHub Environment: dev, auto)
+#   apply-staging — plan+apply staging (GitHub Environment: staging, gated reviewer)
 #
-# ScaledObject exclusion:
-#   kubernetes_manifest validates CRDs at plan time. Since KEDA’s Helm chart
-#   (which installs the keda.sh CRDs) hasn’t run yet when the plan executes,
-#   the plan fails with "API did not recognize GroupVersionKind". The -exclude
-#   flag (Terraform ≥ 1.9) removes the ScaledObject from the plan artifact;
-#   apply-dev’s phase-2 step applies it after KEDA is live.
+# Why plan-artifact promotion?
+#   The artifact ensures apply-dev executes EXACTLY the plan reviewed in CI,
+#   not a re-plan that might differ due to timing, drift, or race conditions.
+#   apply-staging does a fresh plan because staging is ephemeral (cold-start
+#   from zero each time; it has no pre-existing plan artifact).
 on:
   push:
     branches: [main]
@@ -30,7 +28,6 @@ jobs:
   # Job 1: plan-dev
   # Generate the dev plan and upload it as an artifact so apply-dev can
   # apply the exact plan reviewed in the PR without re-planning.
-  # The ScaledObject is excluded (see header comment).
   # --------------------------------------------------------------------------
   plan-dev:
     name: Plan (dev)
@@ -52,7 +49,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~> 1.9"
+          terraform_version: "~> 1.8"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -70,8 +67,7 @@ jobs:
           terraform plan \
             -var-file=envs/dev/dev.tfvars \
             -out=tfplan \
-            -no-color \
-            -exclude=module.keda.kubernetes_manifest.consumer_scaledobject
+            -no-color
         working-directory: infra/
 
       - name: Upload plan artifact
@@ -83,12 +79,10 @@ jobs:
 
   # --------------------------------------------------------------------------
   # Job 2: apply-dev
-  # Phase 1: download the tfplan artifact and apply it without re-planning.
-  #   terraform apply <planfile> applies exactly the reviewed plan, including
-  #   the KEDA Helm release which installs the keda.sh CRDs.
-  # Phase 2: apply only the ScaledObject, now that the CRDs are available.
-  #   -target limits the second apply to a single resource so it doesn't
-  #   re-plan the entire stack.
+  # Download the tfplan artifact and apply it without re-planning.
+  # terraform apply <planfile> cannot accept -target flags; the plan already
+  # encodes the correct dependency order. Since the dev EKS cluster already
+  # exists, a single apply is sufficient (no two-phase bootstrap needed).
   # --------------------------------------------------------------------------
   apply-dev:
     name: Apply (dev)
@@ -109,7 +103,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~> 1.9"
+          terraform_version: "~> 1.8"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -131,31 +125,20 @@ jobs:
           name: tfplan-dev-${{ github.run_id }}
           path: infra/
 
-      - name: Apply plan (dev) — phase 1 (all resources except ScaledObject)
+      - name: Apply plan (dev)
         run: terraform apply tfplan
-        working-directory: infra/
-
-      # Phase 2: the KEDA Helm chart (applied in phase 1) has now installed
-      # the keda.sh CRDs. Apply the ScaledObject with -target so Terraform
-      # only plans and applies this single resource without re-diffing the
-      # entire stack.
-      - name: Apply ScaledObject (dev) — phase 2 (KEDA CRDs now available)
-        run: |
-          terraform apply -auto-approve \
-            -var-file=envs/dev/dev.tfvars \
-            -target=module.keda.kubernetes_manifest.consumer_scaledobject
         working-directory: infra/
 
   # --------------------------------------------------------------------------
   # Job 3: apply-staging
-  # Three-phase cold-start apply for staging (no pre-existing cluster).
-  # Requires manual approval from the reviewer configured in the GitHub
-  # Environment "staging" (ADR 0012). Runs only after apply-dev succeeds.
+  # Plan + apply the staging environment from scratch. Uses the GitHub
+  # Environment "staging" which requires a manual approval from the designated
+  # reviewer before proceeding (ADR 0012). Runs only after apply-dev succeeds.
   #
-  # Phase 1 — AWS infra: network → EKS, SQS, scheduler (no K8s resources).
-  # Phase 2a — ALB controller + KEDA Helm: installs Helm charts and CRDs.
-  # Phase 2b — Full stack: in-cluster resources (ingress, ScaledObject, etc.)
-  #             now that the cluster is reachable and CRDs are available.
+  # Two-phase apply because staging is a cold-start: the EKS cluster doesn't
+  # exist yet, so the Kubernetes/Helm provider can't connect during a full
+  # plan. Phase 1 creates the AWS infra (incl. EKS); Phase 2 creates the
+  # in-cluster resources once the cluster endpoint is reachable.
   # --------------------------------------------------------------------------
   apply-staging:
     name: Apply (staging)
@@ -177,7 +160,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~> 1.9"
+          terraform_version: "~> 1.8"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -191,9 +174,9 @@ jobs:
         working-directory: infra/
 
       # Phase 1: create AWS infra (network → EKS, SQS, scheduler) before the
-      # Kubernetes/Helm provider tries to connect to a cluster that doesn’t
-      # exist yet (cold-start chicken-egg, same as dev’s first apply in D3).
-      - name: Apply infrastructure (phase 1 — network → eks, async, scheduler)
+      # Kubernetes/Helm provider tries to connect to a cluster that doesn't
+      # exist yet (cold-start chicken-egg, same as dev's first apply in D3).
+      - name: Apply infrastructure (network → eks, async, scheduler)
         run: |
           terraform apply -auto-approve \
             -var-file=envs/staging/staging.tfvars \
@@ -209,25 +192,8 @@ jobs:
             -target=module.scheduler
         working-directory: infra/
 
-      # Phase 2a: install ALB controller + KEDA Helm release.
-      # The Helm charts install the keda.sh CRDs needed by the ScaledObject
-      # resource in phase 2b. Without this intermediate step a full apply
-      # would fail: kubernetes_manifest validates CRDs at plan time, and the
-      # CRDs don’t exist until the Helm chart runs.
-      - name: Apply Helm charts (phase 2a — alb_controller + keda helm)
-        run: |
-          terraform apply -auto-approve \
-            -var-file=envs/staging/staging.tfvars \
-            -target=module.alb_controller \
-            -target=module.keda.aws_iam_policy.keda_sqs \
-            -target=module.keda.module.keda_irsa \
-            -target=module.keda.helm_release.keda
-        working-directory: infra/
-
-      # Phase 2b: apply the full stack now that the cluster endpoint is live
-      # and the keda.sh CRDs are installed. This creates the ingress resources,
-      # the consumer Deployment/SA/IRSA, and the ScaledObject.
-      - name: Apply full stack (phase 2b — ingress, consumer, ScaledObject)
+      # Phase 2: apply everything else now that the cluster endpoint is live.
+      - name: Apply full stack (alb_controller, ingress, keda)
         run: |
           terraform apply -auto-approve \
             -var-file=envs/staging/staging.tfvars

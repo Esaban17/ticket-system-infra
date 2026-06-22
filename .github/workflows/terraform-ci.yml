@@ -32,7 +32,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~> 1.9"
+          terraform_version: "~> 1.8"
 
       - name: Terraform Format Check
         run: terraform fmt --check -recursive
@@ -61,7 +61,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~> 1.9"
+          terraform_version: "~> 1.8"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -82,14 +82,6 @@ jobs:
   # Job 3: plan
   # Generate the plan, upload it as an artifact for artifact-promotion apply,
   # and post it as a PR comment so reviewers see exactly what will change.
-  #
-  # The ScaledObject (module.keda.kubernetes_manifest.consumer_scaledobject)
-  # is excluded from this plan: kubernetes_manifest validates the ScaledObject
-  # CRD against the live cluster at plan time, but the CRD is installed by the
-  # KEDA Helm chart which hasn’t been applied yet. Terraform 1.9’s -exclude
-  # flag skips the resource from the plan; apply-dev handles it in phase 2
-  # once KEDA is live (see terraform-apply.yml).
-  #
   # Status check name (required by ruleset): "plan"
   # --------------------------------------------------------------------------
   plan:
@@ -111,7 +103,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~> 1.9"
+          terraform_version: "~> 1.8"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -131,14 +123,11 @@ jobs:
             -var-file=envs/dev/dev.tfvars \
             -out=tfplan \
             -no-color \
-            -exclude=module.keda.kubernetes_manifest.consumer_scaledobject \
             2>&1 | tee plan.txt
         working-directory: infra/
 
       # Upload the binary plan artifact so apply-dev can download and apply it
       # without re-planning — this is the plan-artifact promotion pattern (ADR 0012).
-      # Note: the artifact does NOT include the ScaledObject (excluded above);
-      # apply-dev handles it in a dedicated phase-2 step.
       - name: Upload plan artifact
         if: always()
         uses: actions/upload-artifact@v4

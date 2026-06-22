@@ -8,12 +8,13 @@
 #   Deployment's replica count via an HPA. identityOwner=operator means KEDA
 #   uses its own AWS identity — no per-pod credential overhead.
 #
-# Note — two-phase apply required:
-#   The kubernetes_manifest for the ScaledObject references the ScaledObject
-#   CRD installed by the KEDA Helm chart. Terraform plans fail if the CRD
-#   doesn't exist yet. The apply workflow's two-phase approach handles this:
-#   Phase 1 targets infra modules (incl. eks); Phase 2 applies everything else
-#   (incl. this module's helm_release and then kubernetes_manifest).
+# Note — kubectl_manifest for the ScaledObject:
+#   The official kubernetes_manifest resource validates the ScaledObject CRD
+#   against the live cluster at plan time. Since the CRD is installed by
+#   helm_release.keda, this caused plan failures before KEDA was deployed.
+#   kubectl_manifest (alekc/kubectl) defers CRD validation to apply time;
+#   depends_on = [helm_release.keda] ensures the CRD exists before the
+#   ScaledObject is created (ADR 0011).
 # ---------------------------------------------------------------------------
 
 # ---- KEDA operator IRSA ------------------------------------------------------
@@ -84,9 +85,14 @@ resource "helm_release" "keda" {
 # Tells KEDA to scale the consumer Deployment based on the SQS queue depth.
 # identityOwner=operator: KEDA uses the operator's IRSA credentials to call
 # GetQueueAttributes — no additional IAM setup on the consumer pods.
+#
+# kubectl_manifest is used instead of kubernetes_manifest because the official
+# provider validates the ScaledObject CRD at plan time, before KEDA installs it.
+# kubectl_manifest defers validation to apply; depends_on ensures KEDA CRDs are
+# present before the ScaledObject is created.
 
-resource "kubernetes_manifest" "consumer_scaledobject" {
-  manifest = {
+resource "kubectl_manifest" "consumer_scaledobject" {
+  yaml_body = yamlencode({
     apiVersion = "keda.sh/v1alpha1"
     kind       = "ScaledObject"
     metadata = {
@@ -106,20 +112,15 @@ resource "kubernetes_manifest" "consumer_scaledobject" {
         {
           type = "aws-sqs-queue"
           metadata = {
-            queueURL    = var.queue_url
-            queueLength = tostring(var.queue_length_trigger)
-            awsRegion   = var.aws_region
-            # identityOwner=operator: KEDA operator uses its own IRSA role
-            # (sqs:GetQueueAttributes) instead of burdening the consumer pods
-            # with additional IAM permissions.
+            queueURL      = var.queue_url
+            queueLength   = tostring(var.queue_length_trigger)
+            awsRegion     = var.aws_region
             identityOwner = "operator"
           }
         }
       ]
     }
-  }
+  })
 
-  # The ScaledObject CRD is installed by the Helm chart. Apply ordering:
-  # helm_release installs CRDs → kubernetes_manifest creates the ScaledObject.
   depends_on = [helm_release.keda]
 }
