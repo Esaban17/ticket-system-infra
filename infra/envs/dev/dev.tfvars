@@ -34,3 +34,10 @@ keda_queue_length_trigger = 5
 # Scheduler — Delivery 4
 scheduler_expression = "rate(1 day)"
 scheduler_timezone   = "UTC"
+
+# Image tags — pinned to the images currently running in the cluster.
+# api-deploy and web-deploy (PR #64) pushed c8d1d66 on 2026-06-22.
+# Without these pins terraform-apply would fall back to the variable
+# defaults ("d3" / "bootstrap") causing unwanted rollbacks / ImagePullBackOff.
+api_image_tag = "c8d1d66"
+web_image_tag = "c8d1d66"
