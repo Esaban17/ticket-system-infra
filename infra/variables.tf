@@ -97,6 +97,20 @@ variable "api_cors_origins" {
   default     = "http://localhost:5173,http://localhost:3000"
 }
 
+# ---- Dominio propio / HTTPS (subdominio en Hostinger) ---------------------
+
+variable "app_domain" {
+  description = "FQDN del subdominio que sirve la app (CNAME → ALB en Hostinger). Se emite un cert ACM para este nombre."
+  type        = string
+  default     = "tickets.nextcodegt.com"
+}
+
+variable "enable_https" {
+  description = "Fase 2: cuando true, valida el cert ACM (debe existir ya el CNAME de validación) y agrega el listener HTTPS 443 + redirect al ALB. Default false (fase 1: solo crea el cert y expone los registros de validación)."
+  type        = bool
+  default     = false
+}
+
 # ---- Application / ingress ports ------------------------------------------
 
 variable "app_port" {

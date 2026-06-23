@@ -62,15 +62,25 @@ resource "kubernetes_ingress_v1" "app" {
     namespace = kubernetes_namespace.this.metadata[0].name
     labels    = local.labels
 
-    annotations = {
-      "alb.ingress.kubernetes.io/scheme"                              = "internet-facing"
-      "alb.ingress.kubernetes.io/target-type"                         = "ip"
-      "alb.ingress.kubernetes.io/listen-ports"                        = "[{\"HTTP\": 80}]"
-      "alb.ingress.kubernetes.io/healthcheck-path"                    = var.health_check_path
-      "alb.ingress.kubernetes.io/healthcheck-protocol"                = "HTTP"
-      "alb.ingress.kubernetes.io/security-groups"                     = var.web_security_group_id
-      "alb.ingress.kubernetes.io/manage-backend-security-group-rules" = "true"
-    }
+    # listen-ports suma 443 con enable_https; las anotaciones de cert + redirect
+    # solo se agregan en ese caso (un cert ARN vacío rompería al controller).
+    annotations = merge(
+      {
+        "alb.ingress.kubernetes.io/scheme"                              = "internet-facing"
+        "alb.ingress.kubernetes.io/target-type"                         = "ip"
+        "alb.ingress.kubernetes.io/healthcheck-path"                    = var.health_check_path
+        "alb.ingress.kubernetes.io/healthcheck-protocol"                = "HTTP"
+        "alb.ingress.kubernetes.io/security-groups"                     = var.web_security_group_id
+        "alb.ingress.kubernetes.io/manage-backend-security-group-rules" = "true"
+        "alb.ingress.kubernetes.io/listen-ports" = var.enable_https ? (
+          "[{\"HTTP\": 80}, {\"HTTPS\": 443}]"
+        ) : "[{\"HTTP\": 80}]"
+      },
+      var.enable_https ? {
+        "alb.ingress.kubernetes.io/certificate-arn" = var.acm_certificate_arn
+        "alb.ingress.kubernetes.io/ssl-redirect"    = "443"
+      } : {}
+    )
   }
 
   spec {
