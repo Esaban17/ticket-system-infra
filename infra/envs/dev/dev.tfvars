@@ -4,11 +4,11 @@ region                = "us-east-1"
 tickets_bucket_suffix = "galileo-pdds"
 
 # Dominio propio / HTTPS. app_domain sirve la app por un CNAME en Hostinger.
-# enable_https=false (fase 1): solo crea el cert ACM y expone los registros de
-# validación. Tras agregar el CNAME de validación y que ACM quede ISSUED, se
-# pone enable_https=true (fase 2) para sumar el listener 443 + redirect al ALB.
+# enable_https=true: el cert ACM ya está ISSUED (el CNAME de validación vive en
+# Hostinger) y el ALB sirve el listener 443 + redirect 80→443. Esto reconcilia
+# en IaC el HTTPS que ya está vivo en tickets.nextcodegt.com.
 app_domain   = "tickets.nextcodegt.com"
-enable_https = false
+enable_https = true
 
 # S3 CORS para subir adjuntos prefirmados desde el navegador. Incluye el ALB
 # (HTTP) y el subdominio propio (HTTPS), ya que el SPA puede servirse en ambos.
@@ -69,8 +69,8 @@ scheduler_expression = "rate(1 day)"
 scheduler_timezone   = "UTC"
 
 # Image tags — pinned to the images currently running in the cluster.
-# api-deploy and web-deploy (PR #64) pushed c8d1d66 on 2026-06-22.
-# Without these pins terraform-apply would fall back to the variable
-# defaults ("d3" / "bootstrap") causing unwanted rollbacks / ImagePullBackOff.
-api_image_tag = "c8d1d66"
-web_image_tag = "c8d1d66"
+# 6b2bc63 = merge de #77 (Cognito + adjuntos + todo lo previo), desplegado el
+# 2026-06-23. Mantener el pin sincronizado con el último deploy evita que un
+# terraform-apply revierta el API/web a una imagen vieja (regresión de Cognito).
+api_image_tag = "6b2bc63"
+web_image_tag = "6b2bc63"

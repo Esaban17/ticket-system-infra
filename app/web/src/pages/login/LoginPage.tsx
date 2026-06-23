@@ -6,19 +6,13 @@ import { useAuth } from '../../auth/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { ErrorBanner } from '../../components/ui/ErrorBanner';
 
-/**
- * Construye la URL del Hosted UI de Cognito (authorization code flow).
- * El redirect_uri se deriva del origin actual (no de la config) para que el
- * MISMO build funcione en localhost y en el subdominio HTTPS — ambos callbacks
- * están registrados en el App Client. Debe coincidir con el que usa
- * CognitoCallbackPage en el intercambio del code.
- */
+/** Construye la URL del Hosted UI de Cognito (authorization code flow). */
 function cognitoLoginUrl(c: NonNullable<AuthConfig['cognito']>): string {
   const params = new URLSearchParams({
     client_id: c.clientId,
     response_type: 'code',
     scope: c.scope,
-    redirect_uri: `${window.location.origin}/auth/callback`,
+    redirect_uri: c.redirectUri,
   });
   return `${c.domain}/login?${params.toString()}`;
 }

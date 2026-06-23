@@ -33,6 +33,13 @@ jobs:
     name: Plan (dev)
     runs-on: ubuntu-latest
 
+    # Serializa las operaciones sobre el STATE de dev con api-deploy/web-deploy
+    # (mismo grupo) para no chocar en el lock de DynamoDB. A nivel job para que
+    # el gate de apply-staging NO bloquee a los deploys.
+    concurrency:
+      group: terraform-apply-dev
+      cancel-in-progress: false
+
     # Kill-switch: skip the entire pipeline when INFRA_AUTO_APPLY is 'false'.
     if: ${{ vars.INFRA_AUTO_APPLY != 'false' }}
 
@@ -100,6 +107,11 @@ jobs:
     needs: plan-dev
     runs-on: ubuntu-latest
     environment: dev
+
+    # Mismo grupo que plan-dev y los *-deploy: serializa el apply al state de dev.
+    concurrency:
+      group: terraform-apply-dev
+      cancel-in-progress: false
 
     permissions:
       contents: read
