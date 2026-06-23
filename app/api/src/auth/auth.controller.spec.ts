@@ -1,8 +1,9 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Role, User } from '@prisma/client';
 
 import { AuthController } from './auth.controller';
 import { AuthModule } from './auth.module';
+import { CognitoService } from './cognito.service';
 import { UsersService } from '@/users/users.service';
 
 const user = {
@@ -11,9 +12,19 @@ const user = {
   role: Role.agente,
 } as User;
 
+/** CognitoService de prueba con `provider` configurable. */
+function cognitoStub(provider: 'mock' | 'cognito' = 'mock') {
+  return {
+    provider,
+    getPublicConfig: jest.fn(() => ({ provider, cognito: null })),
+    exchangeCode: jest.fn(),
+  } as unknown as CognitoService;
+}
+
 describe('AuthController', () => {
   const users = { findByEmail: jest.fn() } as unknown as UsersService;
-  const controller = new AuthController(users);
+  const cognito = cognitoStub('mock');
+  const controller = new AuthController(users, cognito);
 
   afterEach(() => jest.clearAllMocks());
 
@@ -59,6 +70,30 @@ describe('AuthController', () => {
       ).sub;
     expect(subOf(a.token)).toBe(user.id);
     expect(subOf(b.token)).toBe(user.id);
+  });
+
+  it('login: con AUTH_PROVIDER=cognito → ForbiddenException (403)', async () => {
+    const ctrl = new AuthController(users, cognitoStub('cognito'));
+    await expect(ctrl.login({ email: user.email, password: 'x' })).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(users.findByEmail).not.toHaveBeenCalled();
+  });
+
+  it('config: delega en CognitoService.getPublicConfig', () => {
+    const cog = cognitoStub('cognito');
+    const ctrl = new AuthController(users, cog);
+    ctrl.config();
+    expect(cog.getPublicConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it('exchange: delega el code/redirectUri en CognitoService.exchangeCode', async () => {
+    const cog = cognitoStub('cognito');
+    (cog.exchangeCode as jest.Mock).mockResolvedValue({ token: 't', user });
+    const ctrl = new AuthController(users, cog);
+
+    await ctrl.exchange({ code: 'abc', redirectUri: 'http://localhost:5173/auth/callback' });
+    expect(cog.exchangeCode).toHaveBeenCalledWith('abc', 'http://localhost:5173/auth/callback');
   });
 
   it('me: devuelve id/email/role del usuario autenticado', () => {

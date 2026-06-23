@@ -164,3 +164,15 @@ export interface LoginResponse {
   token: string;
   user: User;
 }
+
+/** GET /v1/auth/config — el SPA decide qué mostrar (form mock y/o SSO Cognito). */
+export interface AuthConfig {
+  provider: 'mock' | 'cognito';
+  cognito: {
+    domain: string;
+    clientId: string;
+    redirectUri: string;
+    logoutUri: string | null;
+    scope: string;
+  } | null;
+}

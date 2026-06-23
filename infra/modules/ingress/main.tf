@@ -78,8 +78,22 @@ resource "kubernetes_config_map" "app" {
       LOG_LEVEL                 = "log"
       PORT                      = tostring(var.app_port)
       TICKETS_RESOURCE          = var.app_resource
+      # EP-14: proveedor de auth. mock = login por contraseña sigue activo.
+      AUTH_PROVIDER = var.auth_provider
     },
-    var.sqs_queue_url != "" ? { SQS_QUEUE_URL = var.sqs_queue_url } : {}
+    var.sqs_queue_url != "" ? { SQS_QUEUE_URL = var.sqs_queue_url } : {},
+    # CORS: necesario para el demo SSO (SPA en localhost → API del ALB).
+    var.cors_origins != "" ? { CORS_ORIGINS = var.cors_origins } : {},
+    # Config Cognito (no sensible: pool/client/dominio son públicos). Solo se
+    # inyecta cuando hay pool, para que /auth/config la exponga al SPA y el
+    # backend pueda intercambiar el code + verificar el ID token (JWKS).
+    var.cognito_user_pool_id != "" ? {
+      COGNITO_USER_POOL_ID = var.cognito_user_pool_id
+      COGNITO_CLIENT_ID    = var.cognito_client_id
+      COGNITO_DOMAIN       = var.cognito_hosted_ui_domain
+      COGNITO_REDIRECT_URI = var.cognito_redirect_uri
+      COGNITO_LOGOUT_URI   = var.cognito_logout_uri
+    } : {}
   )
 }
 

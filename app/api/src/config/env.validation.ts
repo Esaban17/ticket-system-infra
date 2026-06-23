@@ -17,6 +17,21 @@ export const envSchema = z.object({
   JWT_SECRET: z.string().min(32, 'JWT_SECRET debe tener al menos 32 caracteres'),
   JWT_EXPIRES_IN: z.string().default('3600s'),
 
+  // Auth provider (EP-14). 'mock' mantiene el login por contraseña como fallback;
+  // 'cognito' fuerza solo SSO (rechaza /auth/login). El botón SSO se habilita
+  // siempre que la config Cognito esté presente, independiente de este flag.
+  AUTH_PROVIDER: z.enum(['mock', 'cognito']).default('mock'),
+
+  // Cognito Hosted UI (opcionales; presentes solo cuando el pool está provisionado).
+  // No son secretos: pool id, client id y dominio son públicos. El SPA los usa
+  // para construir la URL de authorize; el backend para intercambiar el code y
+  // verificar el ID token vía JWKS.
+  COGNITO_USER_POOL_ID: z.string().optional(),
+  COGNITO_CLIENT_ID: z.string().optional(),
+  COGNITO_DOMAIN: z.string().url().optional(),
+  COGNITO_REDIRECT_URI: z.string().url().optional(),
+  COGNITO_LOGOUT_URI: z.string().url().optional(),
+
   // Logging
   LOG_LEVEL: z.enum(['error', 'warn', 'log', 'debug', 'verbose']).default('log'),
 

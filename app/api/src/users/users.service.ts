@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, User } from '@prisma/client';
+import { Prisma, Role, User } from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
 
@@ -22,5 +22,18 @@ export class UsersService {
 
   create(data: Prisma.UserCreateInput): Promise<User> {
     return this.prisma.user.create({ data });
+  }
+
+  /**
+   * Provisiona/actualiza un usuario por email (login federado con Cognito,
+   * EP-14). En el primer SSO crea la fila; en logins posteriores sincroniza el
+   * rol según el grupo de Cognito.
+   */
+  upsertByEmail(email: string, role: Role): Promise<User> {
+    return this.prisma.user.upsert({
+      where: { email },
+      create: { email, role },
+      update: { role },
+    });
   }
 }

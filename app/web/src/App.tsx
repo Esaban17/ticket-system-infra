@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, RequireAuth, RequireRole } from './auth/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { LoginPage } from './pages/login/LoginPage';
+import { CognitoCallbackPage } from './pages/login/CognitoCallbackPage';
 import { QueuePage } from './pages/queue/QueuePage';
 import { CreateTicketPage } from './pages/create/CreateTicketPage';
 import { TicketDetailPage } from './pages/detail/TicketDetailPage';
@@ -13,8 +14,9 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Pública */}
+          {/* Públicas */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<CognitoCallbackPage />} />
 
           {/* Protegidas (requieren sesión) */}
           <Route

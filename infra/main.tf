@@ -62,6 +62,20 @@ module "storage" {
   cors_allowed_origins = var.attachments_cors_allowed_origins
 }
 
+# ---- Cognito (IdP / SSO Hosted UI — EP-14) --------------------------------
+
+module "cognito" {
+  source = "./modules/cognito"
+
+  region        = var.region
+  name_prefix   = "${var.project_name}-${var.environment}"
+  domain_prefix = "${var.project_name}-${var.environment}-${var.tickets_bucket_suffix}"
+
+  callback_urls      = var.cognito_callback_urls
+  logout_urls        = var.cognito_logout_urls
+  seed_user_password = var.cognito_seed_user_password
+}
+
 # ---- Compute (Lambda report-generator) -------------------------------------
 # The Lambda is reused from D2 but its handler is now the report-generator
 # (index.py) that lists async objects in S3 and writes a daily summary.
@@ -251,6 +265,18 @@ module "ingress" {
 
   # Consumer Deployment settings.
   polling_batch_size = var.consumer_polling_batch_size
+
+  # EP-14: auth provider flag + Cognito Hosted UI config flowed into the app
+  # ConfigMap so the SPA can start the SSO flow and the API can exchange the
+  # code + verify the ID token (JWKS). auth_provider=mock keeps the password
+  # fallback working; the SSO button enables whenever the cognito block is set.
+  auth_provider            = var.auth_provider
+  cognito_user_pool_id     = module.cognito.user_pool_id
+  cognito_client_id        = module.cognito.client_id
+  cognito_hosted_ui_domain = module.cognito.hosted_ui_domain
+  cognito_redirect_uri     = var.cognito_redirect_uri
+  cognito_logout_uri       = var.cognito_logout_uri
+  cors_origins             = var.api_cors_origins
 
   depends_on = [module.alb_controller]
 }
