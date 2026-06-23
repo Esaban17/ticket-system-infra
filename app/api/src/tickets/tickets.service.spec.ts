@@ -27,6 +27,7 @@ const dto: CreateTicketDto = {
 function setup() {
   const txTicketCreate = jest.fn();
   const txEventCreate = jest.fn();
+  const txAttachmentUpdateMany = jest.fn();
   const prisma = {
     ticket: {
       findFirst: jest.fn(),
@@ -37,12 +38,16 @@ function setup() {
     slaRule: { findUnique: jest.fn() },
     ticketEvent: { create: jest.fn() },
     $transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>) =>
-      cb({ ticket: { create: txTicketCreate }, ticketEvent: { create: txEventCreate } }),
+      cb({
+        ticket: { create: txTicketCreate },
+        ticketEvent: { create: txEventCreate },
+        attachment: { updateMany: txAttachmentUpdateMany },
+      }),
     ),
   } as unknown as PrismaService;
   const users = { findById: jest.fn() } as unknown as UsersService;
   const svc = new TicketsService(prisma, users);
-  return { svc, prisma, users, txTicketCreate, txEventCreate };
+  return { svc, prisma, users, txTicketCreate, txEventCreate, txAttachmentUpdateMany };
 }
 
 describe('TicketsService.create', () => {
@@ -58,6 +63,35 @@ describe('TicketsService.create', () => {
     expect(data.reporterId).toBe('u1');
     expect(data.slaDueAt).toBeInstanceOf(Date);
     expect(txEventCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin attachments no toca la tabla de adjuntos', async () => {
+    const { svc, prisma, txTicketCreate, txAttachmentUpdateMany } = setup();
+    (prisma.slaRule.findUnique as jest.Mock).mockResolvedValue({ timeToResolveMinutes: 60 });
+    txTicketCreate.mockResolvedValue({ id: 't1', ticketNumber: 'TKT-0001' });
+
+    await svc.create(dto, reporter);
+    expect(txAttachmentUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('asocia los adjuntos pending del uploader al ticket creado', async () => {
+    const { svc, prisma, txTicketCreate, txAttachmentUpdateMany } = setup();
+    (prisma.slaRule.findUnique as jest.Mock).mockResolvedValue({ timeToResolveMinutes: 60 });
+    txTicketCreate.mockResolvedValue({ id: 't1', ticketNumber: 'TKT-0001' });
+
+    const ids = ['11111111-1111-4111-8111-111111111111'];
+    await svc.create({ ...dto, attachments: ids }, reporter);
+
+    expect(txAttachmentUpdateMany).toHaveBeenCalledTimes(1);
+    const arg = txAttachmentUpdateMany.mock.calls[0][0];
+    expect(arg.where).toMatchObject({
+      id: { in: ids },
+      uploaderId: 'u1',
+      status: 'pending', // solo vincula adjuntos aún pending
+      ticketId: null,
+    });
+    expect(arg.data).toMatchObject({ ticketId: 't1', status: 'attached', expiresAt: null });
+    expect(arg.data.attachedAt).toBeInstanceOf(Date);
   });
 
   it('Idempotency-Key existente no duplica', async () => {
@@ -93,6 +127,28 @@ describe('TicketsService.getForUser', () => {
     const { svc, prisma } = setup();
     (prisma.ticket.findUnique as jest.Mock).mockResolvedValue({ id: 't1', reporterId: 'otro' });
     await expect(svc.getForUser('t1', reporter)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('mapea los adjuntos asociados a {id, filename}', async () => {
+    const { svc, prisma } = setup();
+    (prisma.ticket.findUnique as jest.Mock).mockResolvedValue({
+      id: 't1',
+      reporterId: reporter.id,
+      attachments: [{ id: 'a1', originalFilename: 'captura.png' }],
+    });
+    const ticket = await svc.getForUser('t1', reporter);
+    expect(ticket.attachments).toEqual([{ id: 'a1', filename: 'captura.png' }]);
+  });
+
+  it('ticket sin adjuntos devuelve attachments vacío', async () => {
+    const { svc, prisma } = setup();
+    (prisma.ticket.findUnique as jest.Mock).mockResolvedValue({
+      id: 't1',
+      reporterId: reporter.id,
+      attachments: [],
+    });
+    const ticket = await svc.getForUser('t1', reporter);
+    expect(ticket.attachments).toEqual([]);
   });
 });
 

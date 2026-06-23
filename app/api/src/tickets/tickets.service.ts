@@ -6,7 +6,15 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { Prisma, Role, Ticket, TicketStatus, User, EventType } from '@prisma/client';
+import {
+  AttachmentStatus,
+  EventType,
+  Prisma,
+  Role,
+  Ticket,
+  TicketStatus,
+  User,
+} from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
 import { UsersService } from '@/users/users.service';
@@ -30,6 +38,16 @@ export interface CreateResult {
   ticket: Ticket;
   created: boolean; // false cuando se resolvió por Idempotency-Key existente
 }
+
+/** Adjunto expuesto en el detalle del ticket (forma que consume el tab Adjuntos del FE). */
+export interface TicketAttachmentRef {
+  id: string;
+  filename: string;
+}
+
+export type TicketWithAttachments = Ticket & {
+  attachments: TicketAttachmentRef[];
+};
 
 @Injectable()
 export class TicketsService {
@@ -90,6 +108,25 @@ export class TicketsService {
             },
           },
         });
+        // EP-06: asocia los adjuntos pre-subidos (pending) al ticket recién creado.
+        // Solo vincula los del propio uploader que aún no tienen ticket; cualquier
+        // id ajeno/expirado/ya-asociado se ignora silenciosamente (no rompe el alta).
+        if (dto.attachments && dto.attachments.length > 0) {
+          await tx.attachment.updateMany({
+            where: {
+              id: { in: dto.attachments },
+              uploaderId: user.id,
+              status: AttachmentStatus.pending,
+              ticketId: null,
+            },
+            data: {
+              ticketId: created.id,
+              status: AttachmentStatus.attached,
+              attachedAt: new Date(),
+              expiresAt: null,
+            },
+          });
+        }
         return created;
       });
       return { ticket, created: true };
@@ -168,14 +205,34 @@ export class TicketsService {
     };
   }
 
-  /** Obtiene un ticket aplicando ownership (reportante solo los propios → 404). */
-  async getForUser(id: string, user: User): Promise<Ticket> {
-    const ticket = await this.prisma.ticket.findUnique({ where: { id } });
+  /**
+   * Obtiene un ticket aplicando ownership (reportante solo los propios → 404).
+   * Incluye los adjuntos ya asociados (status=attached) para que el detalle del
+   * FE pueda listarlos y descargarlos.
+   */
+  async getForUser(id: string, user: User): Promise<TicketWithAttachments> {
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id },
+      include: {
+        attachments: {
+          where: { status: AttachmentStatus.attached },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, originalFilename: true },
+        },
+      },
+    });
     if (!ticket) {
       throw new NotFoundException('Ticket no encontrado');
     }
     requireOwnTicket(ticket, user);
-    return ticket;
+    const { attachments, ...rest } = ticket;
+    return {
+      ...rest,
+      attachments: (attachments ?? []).map((a) => ({
+        id: a.id,
+        filename: a.originalFilename,
+      })),
+    };
   }
 
   /**
