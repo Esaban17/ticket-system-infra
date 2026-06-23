@@ -36,6 +36,28 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
   }
 }
 
+# ---- CORS (browser presigned uploads/downloads) ---------------------------
+# The SPA uploads attachments with a cross-origin PUT to a presigned S3 URL
+# (and downloads with a presigned GET). The browser issues a CORS preflight,
+# so the bucket must echo Access-Control-Allow-Origin for the SPA's origin or
+# the upload fails with "No 'Access-Control-Allow-Origin' header". Scoped to
+# the configured origins (least privilege); disabled entirely when the list is
+# empty. The presigned URL itself is the authorization — CORS only governs
+# which browser origins may issue the request and read the response.
+
+resource "aws_s3_bucket_cors_configuration" "this" {
+  count  = length(var.cors_allowed_origins) > 0 ? 1 : 0
+  bucket = aws_s3_bucket.this.id
+
+  cors_rule {
+    allowed_methods = ["GET", "PUT", "HEAD"]
+    allowed_origins = var.cors_allowed_origins
+    allowed_headers = ["*"]
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3000
+  }
+}
+
 # ---- Public access block --------------------------------------------------
 
 resource "aws_s3_bucket_public_access_block" "this" {

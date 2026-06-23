@@ -41,6 +41,12 @@ variable "tickets_bucket_suffix" {
   default     = "galileo-pdds"
 }
 
+variable "attachments_cors_allowed_origins" {
+  description = "Browser origins (scheme + host, no trailing slash) allowed to upload/download attachments directly to the S3 bucket via presigned URLs. Set this to the SPA origin served by the ingress/ALB; without it the browser blocks the cross-origin PUT with a CORS preflight error. Empty (default) leaves the bucket without CORS — set it per environment in the corresponding tfvars."
+  type        = list(string)
+  default     = []
+}
+
 # ---- Application / ingress ports ------------------------------------------
 
 variable "app_port" {

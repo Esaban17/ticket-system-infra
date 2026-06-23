@@ -3,6 +3,13 @@ project_name          = "ticket-system"
 region                = "us-east-1"
 tickets_bucket_suffix = "galileo-pdds"
 
+# S3 CORS for browser presigned attachment uploads (FE create-ticket dropzone).
+# Must match the SPA origin served by the ingress ALB (scheme + host, no
+# trailing slash). Update this if the ALB is recreated and its DNS changes.
+attachments_cors_allowed_origins = [
+  "http://k8s-ticketsy-ticketsy-0187f58f9a-757327104.us-east-1.elb.amazonaws.com",
+]
+
 # Compute
 lambda_memory_size     = 128
 lambda_timeout_seconds = 30
