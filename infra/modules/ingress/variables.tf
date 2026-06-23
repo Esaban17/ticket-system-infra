@@ -204,3 +204,17 @@ variable "cors_origins" {
   type        = string
   default     = ""
 }
+
+# ---- HTTPS (cert ACM en el ALB) -------------------------------------------
+
+variable "enable_https" {
+  description = "Si true, el ALB agrega listener 443 con el cert ACM y redirige 80→443."
+  type        = bool
+  default     = false
+}
+
+variable "acm_certificate_arn" {
+  description = "ARN del cert ACM (validado) a adjuntar al listener 443. Solo se usa con enable_https=true."
+  type        = string
+  default     = ""
+}

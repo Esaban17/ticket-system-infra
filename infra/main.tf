@@ -76,6 +76,15 @@ module "cognito" {
   seed_user_password = var.cognito_seed_user_password
 }
 
+# ---- TLS (cert ACM para el subdominio HTTPS) ------------------------------
+
+module "tls" {
+  source = "./modules/tls"
+
+  domain_name       = var.app_domain
+  enable_validation = var.enable_https
+}
+
 # ---- Compute (Lambda report-generator) -------------------------------------
 # The Lambda is reused from D2 but its handler is now the report-generator
 # (index.py) that lists async objects in S3 and writes a daily summary.
@@ -277,6 +286,10 @@ module "ingress" {
   cognito_redirect_uri     = var.cognito_redirect_uri
   cognito_logout_uri       = var.cognito_logout_uri
   cors_origins             = var.api_cors_origins
+
+  # HTTPS en el ALB (fase 2): listener 443 con el cert ACM + redirect 80→443.
+  enable_https        = var.enable_https
+  acm_certificate_arn = module.tls.validated_certificate_arn
 
   depends_on = [module.alb_controller]
 }

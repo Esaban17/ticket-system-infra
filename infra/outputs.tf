@@ -198,3 +198,15 @@ output "consumer_role_arn" {
   description = "ARN of the consumer pod IRSA role (sqs:ReceiveMessage/DeleteMessage/GetQueueAttributes + s3:PutObject)."
   value       = module.ingress.consumer_role_arn
 }
+
+# ---- TLS / dominio (subdominio HTTPS) -------------------------------------
+
+output "acm_certificate_arn" {
+  description = "ARN del certificado ACM emitido para app_domain."
+  value       = module.tls.certificate_arn
+}
+
+output "tls_domain_validation" {
+  description = "Registros CNAME a crear en Hostinger para validar el cert ACM (name → value)."
+  value       = module.tls.domain_validation_options
+}

@@ -3,22 +3,38 @@ project_name          = "ticket-system"
 region                = "us-east-1"
 tickets_bucket_suffix = "galileo-pdds"
 
-# S3 CORS for browser presigned attachment uploads (FE create-ticket dropzone).
-# Must match the SPA origin served by the ingress ALB (scheme + host, no
-# trailing slash). Update this if the ALB is recreated and its DNS changes.
+# Dominio propio / HTTPS. app_domain sirve la app por un CNAME en Hostinger.
+# enable_https=true: el cert ACM ya está ISSUED (el CNAME de validación vive en
+# Hostinger) y el ALB sirve el listener 443 + redirect 80→443. Esto reconcilia
+# en IaC el HTTPS que ya está vivo en tickets.nextcodegt.com.
+app_domain   = "tickets.nextcodegt.com"
+enable_https = true
+
+# S3 CORS para subir adjuntos prefirmados desde el navegador. Incluye el ALB
+# (HTTP) y el subdominio propio (HTTPS), ya que el SPA puede servirse en ambos.
 attachments_cors_allowed_origins = [
   "http://k8s-ticketsy-ticketsy-0187f58f9a-757327104.us-east-1.elb.amazonaws.com",
+  "https://tickets.nextcodegt.com",
 ]
 
+# CORS del API (CSV): localhost (demo SSO local) + el subdominio HTTPS.
+api_cors_origins = "http://localhost:5173,http://localhost:3000,https://tickets.nextcodegt.com"
+
 # Auth / Cognito (EP-14). auth_provider=mock mantiene el login por contraseña
-# como fallback en el ALB (HTTP). El SSO Hosted UI exige callback HTTPS salvo
-# http://localhost, y el ALB de dev es HTTP plano (sin dominio/cert), por eso
-# el flujo SSO se prueba con el SPA en localhost contra el Cognito real + API.
-auth_provider         = "mock"
-cognito_callback_urls = ["http://localhost:5173/auth/callback"]
-cognito_logout_urls   = ["http://localhost:5173/login"]
-cognito_redirect_uri  = "http://localhost:5173/auth/callback"
-cognito_logout_uri    = "http://localhost:5173/login"
+# como fallback. Se registran AMBOS callbacks: localhost (demo local) y el
+# subdominio HTTPS (app desplegada). El SPA arma el redirect_uri según su
+# propio origin, así que el mismo build funciona en los dos.
+auth_provider = "mock"
+cognito_callback_urls = [
+  "http://localhost:5173/auth/callback",
+  "https://tickets.nextcodegt.com/auth/callback",
+]
+cognito_logout_urls = [
+  "http://localhost:5173/login",
+  "https://tickets.nextcodegt.com/login",
+]
+cognito_redirect_uri = "https://tickets.nextcodegt.com/auth/callback"
+cognito_logout_uri   = "https://tickets.nextcodegt.com/login"
 
 # Compute
 lambda_memory_size     = 128
@@ -53,8 +69,8 @@ scheduler_expression = "rate(1 day)"
 scheduler_timezone   = "UTC"
 
 # Image tags — pinned to the images currently running in the cluster.
-# api-deploy and web-deploy (PR #64) pushed c8d1d66 on 2026-06-22.
-# Without these pins terraform-apply would fall back to the variable
-# defaults ("d3" / "bootstrap") causing unwanted rollbacks / ImagePullBackOff.
-api_image_tag = "c8d1d66"
-web_image_tag = "c8d1d66"
+# 6b2bc63 = merge de #77 (Cognito + adjuntos + todo lo previo), desplegado el
+# 2026-06-23. Mantener el pin sincronizado con el último deploy evita que un
+# terraform-apply revierta el API/web a una imagen vieja (regresión de Cognito).
+api_image_tag = "6b2bc63"
+web_image_tag = "6b2bc63"
