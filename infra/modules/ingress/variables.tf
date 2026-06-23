@@ -160,3 +160,47 @@ variable "polling_batch_size" {
   type        = number
   default     = 10
 }
+
+# ---- Auth / Cognito (EP-14) — fluyen al ConfigMap del API ------------------
+
+variable "auth_provider" {
+  description = "AUTH_PROVIDER del API (mock | cognito)."
+  type        = string
+  default     = "mock"
+}
+
+variable "cognito_user_pool_id" {
+  description = "ID del User Pool de Cognito (vacío = sin Cognito)."
+  type        = string
+  default     = ""
+}
+
+variable "cognito_client_id" {
+  description = "ID del App Client público del SPA."
+  type        = string
+  default     = ""
+}
+
+variable "cognito_hosted_ui_domain" {
+  description = "Base URL del Hosted UI de Cognito."
+  type        = string
+  default     = ""
+}
+
+variable "cognito_redirect_uri" {
+  description = "redirect_uri OAuth del SPA (debe coincidir con el App Client)."
+  type        = string
+  default     = ""
+}
+
+variable "cognito_logout_uri" {
+  description = "URI de logout que el SPA pasa a Cognito."
+  type        = string
+  default     = ""
+}
+
+variable "cors_origins" {
+  description = "Orígenes CORS permitidos por el API (CSV). El SPA del ALB es mismo-origen y no requiere CORS, pero el demo SSO corre el SPA en localhost (cross-origin al API del ALB), por eso se incluye localhost. Vacío = default del API (localhost:3000)."
+  type        = string
+  default     = ""
+}

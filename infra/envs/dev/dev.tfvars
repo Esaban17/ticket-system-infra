@@ -10,6 +10,16 @@ attachments_cors_allowed_origins = [
   "http://k8s-ticketsy-ticketsy-0187f58f9a-757327104.us-east-1.elb.amazonaws.com",
 ]
 
+# Auth / Cognito (EP-14). auth_provider=mock mantiene el login por contraseña
+# como fallback en el ALB (HTTP). El SSO Hosted UI exige callback HTTPS salvo
+# http://localhost, y el ALB de dev es HTTP plano (sin dominio/cert), por eso
+# el flujo SSO se prueba con el SPA en localhost contra el Cognito real + API.
+auth_provider         = "mock"
+cognito_callback_urls = ["http://localhost:5173/auth/callback"]
+cognito_logout_urls   = ["http://localhost:5173/login"]
+cognito_redirect_uri  = "http://localhost:5173/auth/callback"
+cognito_logout_uri    = "http://localhost:5173/login"
+
 # Compute
 lambda_memory_size     = 128
 lambda_timeout_seconds = 30

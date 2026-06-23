@@ -18,6 +18,26 @@ export const configuration = (env: EnvConfig) => ({
     expiresIn: env.JWT_EXPIRES_IN,
   },
 
+  auth: {
+    provider: env.AUTH_PROVIDER,
+    // Bloque Cognito solo cuando los 4 campos requeridos están presentes; si
+    // no, queda null y /auth/config reporta cognito: null (SSO deshabilitado).
+    cognito:
+      env.COGNITO_USER_POOL_ID &&
+      env.COGNITO_CLIENT_ID &&
+      env.COGNITO_DOMAIN &&
+      env.COGNITO_REDIRECT_URI
+        ? {
+            userPoolId: env.COGNITO_USER_POOL_ID,
+            clientId: env.COGNITO_CLIENT_ID,
+            domain: env.COGNITO_DOMAIN,
+            redirectUri: env.COGNITO_REDIRECT_URI,
+            logoutUri: env.COGNITO_LOGOUT_URI ?? null,
+            region: env.AWS_REGION ?? null,
+          }
+        : null,
+  },
+
   logging: {
     level: env.LOG_LEVEL,
   },

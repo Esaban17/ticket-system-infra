@@ -47,6 +47,56 @@ variable "attachments_cors_allowed_origins" {
   default     = []
 }
 
+# ---- Auth / Cognito (EP-14) ----------------------------------------------
+
+variable "auth_provider" {
+  description = "Proveedor de autenticación que la app expone (mock | cognito). 'mock' mantiene el login por contraseña como fallback (el botón SSO se habilita igual si hay config Cognito); 'cognito' fuerza solo SSO. Va al ConfigMap del API (AUTH_PROVIDER)."
+  type        = string
+  default     = "mock"
+
+  validation {
+    condition     = contains(["mock", "cognito"], var.auth_provider)
+    error_message = "auth_provider debe ser 'mock' o 'cognito'."
+  }
+}
+
+variable "cognito_callback_urls" {
+  description = "URLs de callback OAuth registradas en el App Client de Cognito. Cognito exige HTTPS salvo http://localhost, por eso en dev el SSO se prueba con el SPA en localhost."
+  type        = list(string)
+  default     = ["http://localhost:5173/auth/callback"]
+}
+
+variable "cognito_logout_urls" {
+  description = "URLs de logout registradas en el App Client de Cognito."
+  type        = list(string)
+  default     = ["http://localhost:5173/login"]
+}
+
+variable "cognito_redirect_uri" {
+  description = "redirect_uri EXACTO que el SPA usa en el flujo OAuth (debe estar en cognito_callback_urls). Se publica en el ConfigMap para que el SPA construya la URL de authorize y el backend intercambie el code."
+  type        = string
+  default     = "http://localhost:5173/auth/callback"
+}
+
+variable "cognito_logout_uri" {
+  description = "URI de logout que el SPA pasa a Cognito (debe estar en cognito_logout_urls)."
+  type        = string
+  default     = "http://localhost:5173/login"
+}
+
+variable "cognito_seed_user_password" {
+  description = "Contraseña permanente de los usuarios semilla del pool de demo. Cumple la política (≥8, mayús/minús/número/símbolo)."
+  type        = string
+  default     = "TicketsDev#2026!"
+  sensitive   = true
+}
+
+variable "api_cors_origins" {
+  description = "Orígenes CORS permitidos por el API (CSV), inyectados al ConfigMap. Incluye localhost:5173 para el demo SSO (SPA local → API del ALB)."
+  type        = string
+  default     = "http://localhost:5173,http://localhost:3000"
+}
+
 # ---- Application / ingress ports ------------------------------------------
 
 variable "app_port" {

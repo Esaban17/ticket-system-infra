@@ -7,6 +7,7 @@ const BASE_ENV: EnvConfig = {
   DATABASE_URL: 'postgresql://user:pass@localhost:5432/tickets',
   JWT_SECRET: 'super-secret-key-that-is-at-least-32-chars!!',
   JWT_EXPIRES_IN: '3600s',
+  AUTH_PROVIDER: 'mock',
   LOG_LEVEL: 'log',
   CORS_ORIGINS: 'http://localhost:3000',
   AWS_REGION: undefined,
@@ -31,6 +32,32 @@ describe('configuration()', () => {
   it('mapea database.url correctamente', () => {
     const config = configuration(BASE_ENV);
     expect(config.database.url).toBe(BASE_ENV.DATABASE_URL);
+  });
+
+  it('auth.provider mapea y cognito es null sin config', () => {
+    const config = configuration(BASE_ENV);
+    expect(config.auth.provider).toBe('mock');
+    expect(config.auth.cognito).toBeNull();
+  });
+
+  it('auth.cognito se arma cuando los 4 campos están presentes', () => {
+    const config = configuration({
+      ...BASE_ENV,
+      AWS_REGION: 'us-east-1',
+      AUTH_PROVIDER: 'cognito',
+      COGNITO_USER_POOL_ID: 'us-east-1_abc',
+      COGNITO_CLIENT_ID: 'client123',
+      COGNITO_DOMAIN: 'https://t.auth.us-east-1.amazoncognito.com',
+      COGNITO_REDIRECT_URI: 'http://localhost:5173/auth/callback',
+      COGNITO_LOGOUT_URI: 'http://localhost:5173/login',
+    });
+    expect(config.auth.provider).toBe('cognito');
+    expect(config.auth.cognito).toMatchObject({
+      userPoolId: 'us-east-1_abc',
+      clientId: 'client123',
+      redirectUri: 'http://localhost:5173/auth/callback',
+      region: 'us-east-1',
+    });
   });
 
   it('mapea jwt.secret y jwt.expiresIn correctamente', () => {
