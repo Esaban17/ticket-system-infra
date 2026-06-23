@@ -56,9 +56,10 @@ module "security" {
 module "storage" {
   source = "./modules/storage"
 
-  environment   = var.environment
-  bucket_name   = "${var.project_name}-${var.environment}-attachments-${var.tickets_bucket_suffix}"
-  force_destroy = var.environment != "prod"
+  environment          = var.environment
+  bucket_name          = "${var.project_name}-${var.environment}-attachments-${var.tickets_bucket_suffix}"
+  force_destroy        = var.environment != "prod"
+  cors_allowed_origins = var.attachments_cors_allowed_origins
 }
 
 # ---- Compute (Lambda report-generator) -------------------------------------

@@ -19,6 +19,12 @@ variable "force_destroy" {
   default     = false
 }
 
+variable "cors_allowed_origins" {
+  description = "Browser origins (scheme + host, no trailing slash) allowed to upload/download attachments DIRECTLY to S3 via presigned URLs. The SPA performs a cross-origin PUT/GET from the ingress (ALB) origin, so without a matching CORS rule the browser blocks the preflight. Empty list (default) leaves the bucket without a CORS configuration, preserving prior behaviour for environments that don't serve a browser SPA."
+  type        = list(string)
+  default     = []
+}
+
 variable "lifecycle_prefix" {
   description = "Key prefix scope for the lifecycle rule. Required by the rubric: lifecycle rules must NOT apply to the entire bucket without a scope. Defaults to 'attachments/' which is where ticket attachments live."
   type        = string
