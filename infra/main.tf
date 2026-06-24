@@ -19,6 +19,13 @@
 
 locals {
   eks_cluster_name = "${var.project_name}-${var.environment}-eks"
+
+  # Worker Lambda name shared by module.compute (name) and module.iam
+  # (function_name). module.iam composes the Lambda + log-group ARNs BY NAME to
+  # break the iam <-> compute dependency cycle; deriving both from one local
+  # keeps them in sync from a single edit (no repeated "worker" string literal).
+  worker_name          = "worker"
+  worker_function_name = "${var.project_name}-${var.environment}-${local.worker_name}"
 }
 
 # ---- Network --------------------------------------------------------------
@@ -85,27 +92,55 @@ module "tls" {
   enable_validation = var.enable_https
 }
 
+# ---- IAM (Delivery 5 — Deliverable A: centralized IAM module) -------------
+# Single home for the four project IAM roles + the app/consumer policies:
+#   - lambda_exec  -> consumed by module.compute (execution_role_arn)
+#   - scheduler    -> consumed by module.scheduler (scheduler_role_arn)
+#   - app/consumer policies -> consumed by module.ingress IRSA roles
+#   - ci_runner + GitHub OIDC provider -> re-exposed at the root (Deliverable C)
+#
+# Declared BEFORE compute/scheduler/ingress so its outputs are available to
+# them. CYCLE NOTE: compute needs the execution role from iam, and iam needs
+# the Lambda ARN for the scheduler policy. To break the cycle, iam composes the
+# target Lambda ARN BY NAME (function_name) instead of reading
+# module.compute.function_arn — so iam does NOT depend on compute.
+
+module "iam" {
+  source = "./modules/iam"
+
+  name_prefix   = "${var.project_name}-${var.environment}"
+  environment   = var.environment
+  function_name = local.worker_function_name
+
+  bucket_arn    = module.storage.bucket_arn
+  sqs_queue_arn = module.async.queue_arn
+
+  # target_lambda_arn left empty: iam composes it by name to avoid the
+  # iam <-> compute dependency cycle.
+}
+
 # ---- Compute (Lambda report-generator) -------------------------------------
 # The Lambda is reused from D2 but its handler is now the report-generator
 # (index.py) that lists async objects in S3 and writes a daily summary.
 # Invoked by the EventBridge Scheduler (module.scheduler) via the dedicated
-# scheduler IAM role (ADR 0013). S3 permissions are scoped to the specific
-# bucket ARN (no wildcard resources).
+# scheduler IAM role (centralized in module.iam, ADR 0013). S3 permissions are
+# scoped to the specific bucket ARN (no wildcard resources).
 
 module "compute" {
   source = "./modules/compute"
 
   environment     = var.environment
   project_name    = var.project_name
-  name            = "worker"
+  name            = local.worker_name
   memory_size     = var.lambda_memory_size
   timeout_seconds = var.lambda_timeout_seconds
   vpc_id          = module.network.vpc_id
   subnet_ids      = module.network.private_subnet_ids
 
+  # D5: execution role centralized in module.iam (no IAM in the compute module).
+  execution_role_arn = module.iam.lambda_exec_role_arn
+
   # D4: pass bucket so the Lambda can list and write S3 objects.
-  # enable_s3_access uses a static bool (not derived from module.storage)
-  # to avoid "count depends on apply-time value" on cold-start applies.
   bucket_name      = module.storage.bucket_id
   bucket_arn       = module.storage.bucket_arn
   enable_s3_access = true
@@ -235,6 +270,9 @@ module "scheduler" {
   schedule_expression = var.scheduler_expression
   target_lambda_arn   = module.compute.function_arn
   scheduler_timezone  = var.scheduler_timezone
+
+  # D5: scheduler role centralized in module.iam (lambda:InvokeFunction only).
+  scheduler_role_arn = module.iam.scheduler_role_arn
 }
 
 # ---- Ingress + app (Deliverable C + D, extended in D4) --------------------
@@ -271,6 +309,11 @@ module "ingress" {
   # D4: wire the SQS queue into the app ConfigMap (SQS_QUEUE_URL) and IRSA.
   sqs_queue_arn = module.async.queue_arn
   sqs_queue_url = module.async.queue_url
+
+  # D5: app/consumer IAM policies centralized in module.iam; attached to the
+  # IRSA roles created here.
+  app_policy_arn      = module.iam.app_policy_arn
+  consumer_policy_arn = module.iam.consumer_policy_arn
 
   # Consumer Deployment settings.
   polling_batch_size = var.consumer_polling_batch_size

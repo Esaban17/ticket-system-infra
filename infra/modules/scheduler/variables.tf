@@ -17,6 +17,11 @@ variable "target_lambda_arn" {
   type        = string
 }
 
+variable "scheduler_role_arn" {
+  description = "ARN of the dedicated EventBridge Scheduler IAM role, created by the centralized ./modules/iam module (Delivery 5, Deliverable A). Used as the schedule target's role_arn. The role grants only lambda:InvokeFunction on the target Lambda ARN (no wildcard resource)."
+  type        = string
+}
+
 variable "scheduler_timezone" {
   description = "IANA timezone for interpreting the schedule expression (e.g. 'America/Guatemala', 'UTC'). Only relevant for cron expressions; rate() expressions are timezone-independent."
   type        = string

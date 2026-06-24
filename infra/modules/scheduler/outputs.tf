@@ -8,6 +8,6 @@ output "schedule_arn" {
 }
 
 output "scheduler_role_arn" {
-  description = "ARN of the dedicated IAM role used by EventBridge Scheduler to invoke the target Lambda. Scoped to lambda:InvokeFunction on the specific target ARN only (ADR 0013)."
-  value       = aws_iam_role.scheduler.arn
+  description = "ARN of the dedicated IAM role used by EventBridge Scheduler to invoke the target Lambda (created in ./modules/iam, injected via var.scheduler_role_arn). Scoped to lambda:InvokeFunction on the specific target ARN only."
+  value       = var.scheduler_role_arn
 }
