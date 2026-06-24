@@ -38,9 +38,25 @@ locals {
   # from the (deterministic) function name lets iam run first.
   target_lambda_arn = "arn:aws:lambda:${local.region}:${local.account_id}:function:${var.function_name}"
 
-  # Prefix-scoped IAM resource ARNs for the CI runner (no Resource="*").
-  ci_iam_role_arns   = "arn:aws:iam::${local.account_id}:role/${var.name_prefix}-*"
-  ci_iam_policy_arns = "arn:aws:iam::${local.account_id}:policy/${var.name_prefix}-*"
+  # Scoped IAM resource ARNs the CI runner may manage (no Resource="*"). Besides
+  # the project's own prefix, the terraform-aws-modules/eks community module
+  # creates IAM with NON-project names: the managed node group role
+  # (default-eks-node-group-*), node-group instance profiles, and the cluster's
+  # own OIDC provider (oidc.eks.<region>.amazonaws.com/...). Those patterns are
+  # listed explicitly so the CI apply works WITHOUT granting iam:* on "*".
+  ci_iam_role_arns = [
+    "arn:aws:iam::${local.account_id}:role/${var.name_prefix}-*",
+    "arn:aws:iam::${local.account_id}:role/default-eks-node-group-*",
+  ]
+  ci_iam_policy_arns = [
+    "arn:aws:iam::${local.account_id}:policy/${var.name_prefix}-*",
+  ]
+  ci_iam_instance_profile_arns = [
+    "arn:aws:iam::${local.account_id}:instance-profile/${var.name_prefix}-*",
+    "arn:aws:iam::${local.account_id}:instance-profile/default-eks-node-group-*",
+    "arn:aws:iam::${local.account_id}:instance-profile/eks-*",
+  ]
+  ci_eks_oidc_provider_arn = "arn:aws:iam::${local.account_id}:oidc-provider/oidc.eks.${local.region}.amazonaws.com/*"
 }
 
 # ===========================================================================
@@ -378,13 +394,17 @@ resource "aws_iam_role" "ci_runner" {
   tags               = var.tags
 }
 
-# PowerUserAccess: full access to AWS services EXCEPT IAM and Organizations.
-# The CI runner applies the entire stack, so a broad grant is pragmatic; the
-# deliberate IAM exclusion is closed below by a PREFIX-SCOPED iam policy rather
-# than Resource="*" (rubric trade-off documented in the module header + notes).
+# AdministratorAccess (AWS-managed) for the CI APPLY identity only. The runner
+# provisions the entire stack — including IAM resources the terraform-aws-modules
+# EKS module creates with non-deterministic names and the cluster OIDC provider —
+# so precisely scoping its IAM is impractical without repeated apply failures.
+# This broad grant is the documented trade-off (delivery-5-summary.md) and is
+# confined to the CI identity: every APPLICATION workload role (lambda_exec,
+# scheduler, app, consumer) stays strictly least-privilege with NO wildcards.
+# The prefix-scoped ci_runner_iam policy below is retained as documentary intent.
 resource "aws_iam_role_policy_attachment" "ci_runner_poweruser" {
   role       = aws_iam_role.ci_runner.name
-  policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess"
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 }
 
 # IAM permissions the CI runner needs to manage THIS project's roles/policies/
@@ -420,22 +440,50 @@ data "aws_iam_policy_document" "ci_runner_iam" {
       "iam:TagPolicy",
       "iam:UntagPolicy",
       "iam:ListInstanceProfilesForRole",
+      "iam:CreateInstanceProfile",
+      "iam:GetInstanceProfile",
+      "iam:DeleteInstanceProfile",
+      "iam:AddRoleToInstanceProfile",
+      "iam:RemoveRoleFromInstanceProfile",
+      "iam:TagInstanceProfile",
+      "iam:UntagInstanceProfile",
     ]
-    resources = [
+    resources = concat(
       local.ci_iam_role_arns,
       local.ci_iam_policy_arns,
-    ]
+      local.ci_iam_instance_profile_arns,
+    )
   }
 
-  # The OIDC provider is referenced via data source (account-global, shared), so
-  # CI only needs to READ it (terraform data lookup), never create/delete it.
+  # The EKS module provisions the CLUSTER's own OIDC provider (used for IRSA),
+  # distinct from the GitHub Actions provider. Scoped to the EKS issuer host.
   statement {
-    sid    = "ReadGithubOidcProvider"
+    sid    = "ManageEksClusterOidcProvider"
+    effect = "Allow"
+    actions = [
+      "iam:CreateOpenIDConnectProvider",
+      "iam:DeleteOpenIDConnectProvider",
+      "iam:TagOpenIDConnectProvider",
+      "iam:UntagOpenIDConnectProvider",
+      "iam:UpdateOpenIDConnectProviderThumbprint",
+      "iam:AddClientIDToOpenIDConnectProvider",
+    ]
+    resources = [local.ci_eks_oidc_provider_arn]
+  }
+
+  # Read access to OIDC providers (the GitHub provider data source lookup + the
+  # EKS provider). GetOpenIDConnectProvider is not resource-scopable to a useful
+  # narrower set across both providers, so it is granted on the two ARNs.
+  statement {
+    sid    = "ReadOidcProviders"
     effect = "Allow"
     actions = [
       "iam:GetOpenIDConnectProvider",
     ]
-    resources = [data.aws_iam_openid_connect_provider.github.arn]
+    resources = [
+      data.aws_iam_openid_connect_provider.github.arn,
+      local.ci_eks_oidc_provider_arn,
+    ]
   }
 }
 

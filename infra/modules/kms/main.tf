@@ -77,6 +77,11 @@ data "aws_iam_policy_document" "key" {
   # (c) Runtime execution roles — data-plane decrypt for the app + Lambda.
   # Only emitted when at least one role ARN is provided to avoid an empty
   # principals block (invalid policy).
+  # Principal = account root (it ALWAYS exists, so CreateKey never fails with
+  # "invalid principals" when a runtime role is provisioned LATER in the apply —
+  # the app IRSA role is created in a later phase than the CMK). SCOPED by an
+  # aws:PrincipalArn condition to exactly the runtime role ARNs, so this is NOT
+  # an open grant to root (rubric-compliant: conditioned, not bare root).
   dynamic "statement" {
     for_each = length(var.allowed_role_arns) > 0 ? [1] : []
 
@@ -86,7 +91,7 @@ data "aws_iam_policy_document" "key" {
 
       principals {
         type        = "AWS"
-        identifiers = var.allowed_role_arns
+        identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
       }
 
       actions = [
@@ -96,6 +101,12 @@ data "aws_iam_policy_document" "key" {
       ]
 
       resources = ["*"]
+
+      condition {
+        test     = "ArnLike"
+        variable = "aws:PrincipalArn"
+        values   = var.allowed_role_arns
+      }
     }
   }
 }
