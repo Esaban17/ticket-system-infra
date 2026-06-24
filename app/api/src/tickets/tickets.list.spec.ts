@@ -3,6 +3,7 @@ import { Role, TicketStatus, User } from '@prisma/client';
 import { TicketsService } from './tickets.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { UsersService } from '@/users/users.service';
+import { NotificationsService } from '@/notifications/notifications.service';
 
 const reporter = { id: 'u1', role: Role.reportante } as User;
 const agent = { id: 'ag', role: Role.agente } as User;
@@ -13,7 +14,8 @@ function setup() {
     ticketEvent: { findMany: jest.fn() },
   } as unknown as PrismaService;
   const users = { findById: jest.fn() } as unknown as UsersService;
-  return { svc: new TicketsService(prisma, users), prisma };
+  const notifications = { enqueue: jest.fn() } as unknown as NotificationsService;
+  return { svc: new TicketsService(prisma, users, notifications), prisma };
 }
 
 describe('TicketsService.list', () => {

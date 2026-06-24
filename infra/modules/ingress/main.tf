@@ -97,6 +97,10 @@ resource "kubernetes_config_map" "app" {
     },
     var.secret_arn != "" ? { SECRET_ARN = var.secret_arn } : {},
     var.sqs_queue_url != "" ? { SQS_QUEUE_URL = var.sqs_queue_url } : {},
+    # EP-12 / BL-119: remitente verificado de SES. Lo leen TANTO el API (al
+    # encolar arma el correo) como el consumer (DispatchService → SES). Vacío =
+    # no se inyecta y el DispatchService conserva el stub (solo loguea).
+    var.ses_from_address != "" ? { SES_FROM_ADDRESS = var.ses_from_address } : {},
     # CORS: necesario para el demo SSO (SPA en localhost → API del ALB).
     var.cors_origins != "" ? { CORS_ORIGINS = var.cors_origins } : {},
     # Config Cognito (no sensible: pool/client/dominio son públicos). Solo se

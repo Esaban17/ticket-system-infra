@@ -257,6 +257,19 @@ data "aws_iam_policy_document" "app_s3" {
       resources = [var.kms_key_arn]
     }
   }
+
+  # EP-12 / BL-119: el API/consumer envía correos de notificación de tickets vía
+  # SES. ses:SendEmail + ses:SendRawEmail scoped a la EXACTA identidad de email
+  # verificada (no wildcard). Solo se agrega cuando se suministra el ARN.
+  dynamic "statement" {
+    for_each = var.ses_identity_arn != "" ? [1] : []
+    content {
+      sid       = "AllowSendTicketNotificationEmails"
+      effect    = "Allow"
+      actions   = ["ses:SendEmail", "ses:SendRawEmail"]
+      resources = [var.ses_identity_arn]
+    }
+  }
 }
 
 resource "aws_iam_policy" "app_s3" {
@@ -284,6 +297,19 @@ data "aws_iam_policy_document" "consumer" {
     effect    = "Allow"
     actions   = ["s3:PutObject"]
     resources = ["${var.bucket_arn}/*"]
+  }
+
+  # EP-12 / BL-119: el consumer es quien DESPACHA el correo (procesa el mensaje
+  # SQS de notificación y llama a SES). ses:SendEmail + ses:SendRawEmail scoped a
+  # la EXACTA identidad verificada (no wildcard). Solo cuando se suministra el ARN.
+  dynamic "statement" {
+    for_each = var.ses_identity_arn != "" ? [1] : []
+    content {
+      sid       = "AllowConsumerToSendNotificationEmails"
+      effect    = "Allow"
+      actions   = ["ses:SendEmail", "ses:SendRawEmail"]
+      resources = [var.ses_identity_arn]
+    }
   }
 }
 

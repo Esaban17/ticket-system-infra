@@ -340,6 +340,12 @@ variable "monthly_budget_usd" {
   default     = 50
 }
 
+variable "notification_email" {
+  description = "Dirección de email verificada en SES (EP-12 / BL-119) usada como remitente de los correos de notificación de tickets (resuelto/comentado/asignado) y, en sandbox, también como buzón de prueba. Se pasa a module.ses (identidad de email, sin DNS) y fluye a module.iam (scope del SendEmail) y al ConfigMap del app/consumer (SES_FROM_ADDRESS)."
+  type        = string
+  default     = "estuardo1314@gmail.com"
+}
+
 variable "lambda_error_threshold" {
   description = "Threshold (count of worker Lambda invocation errors over the evaluation window) above which the lambda-errors alarm fires."
   type        = number

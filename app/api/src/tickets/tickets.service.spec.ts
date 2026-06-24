@@ -10,6 +10,7 @@ import { Prisma, Role, TicketStatus, User } from '@prisma/client';
 import { TicketsService } from './tickets.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import { UsersService } from '@/users/users.service';
+import { NotificationsService } from '@/notifications/notifications.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 
 const reporter = { id: 'u1', role: Role.reportante } as User;
@@ -35,6 +36,16 @@ function setup() {
       findUniqueOrThrow: jest.fn(),
       updateMany: jest.fn(),
     },
+    user: {
+      // EP-12 / BL-119: notifyReporter lee el reportante; por defecto habilita email.
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'u1',
+        email: 'reporter@b.c',
+        notifyEmail: true,
+        notifySlack: false,
+        slackUserId: null,
+      }),
+    },
     slaRule: { findUnique: jest.fn() },
     ticketEvent: { create: jest.fn() },
     $transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>) =>
@@ -46,8 +57,17 @@ function setup() {
     ),
   } as unknown as PrismaService;
   const users = { findById: jest.fn() } as unknown as UsersService;
-  const svc = new TicketsService(prisma, users);
-  return { svc, prisma, users, txTicketCreate, txEventCreate, txAttachmentUpdateMany };
+  const notifications = { enqueue: jest.fn().mockResolvedValue({ messageId: 'm1' }) };
+  const svc = new TicketsService(prisma, users, notifications as unknown as NotificationsService);
+  return {
+    svc,
+    prisma,
+    users,
+    notifications,
+    txTicketCreate,
+    txEventCreate,
+    txAttachmentUpdateMany,
+  };
 }
 
 describe('TicketsService.create', () => {
@@ -153,8 +173,8 @@ describe('TicketsService.getForUser', () => {
 });
 
 describe('TicketsService.assign', () => {
-  it('asigna con version correcta y registra evento', async () => {
-    const { svc, prisma, users } = setup();
+  it('asigna con version correcta, registra evento y encola correo al reportante', async () => {
+    const { svc, prisma, users, notifications } = setup();
     (prisma.ticket.findUnique as jest.Mock).mockResolvedValue({
       id: 't1',
       assigneeId: null,
@@ -164,12 +184,65 @@ describe('TicketsService.assign', () => {
     (prisma.ticket.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
     (prisma.ticket.findUniqueOrThrow as jest.Mock).mockResolvedValue({
       id: 't1',
+      ticketNumber: 'TKT-0001',
+      title: 'Falla',
+      reporterId: 'u1',
       assigneeId: 'ag',
     });
 
     const r = await svc.assign('t1', { assigneeId: 'ag', expectedVersion: 0 }, admin);
     expect(r.assigneeId).toBe('ag');
     expect(prisma.ticketEvent.create).toHaveBeenCalled();
+    // EP-12 / BL-119: encola ticket.assigned al email del reportante.
+    expect(notifications.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'ticket.assigned',
+        ticketId: 't1',
+        recipientEmail: 'reporter@b.c',
+      }),
+    );
+  });
+
+  it('un fallo del encolado SQS NO rompe la asignación (best-effort)', async () => {
+    const { svc, prisma, users, notifications } = setup();
+    (prisma.ticket.findUnique as jest.Mock).mockResolvedValue({ id: 't1', version: 0 });
+    (users.findById as jest.Mock).mockResolvedValue({ id: 'ag', role: Role.agente });
+    (prisma.ticket.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    (prisma.ticket.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+      id: 't1',
+      ticketNumber: 'TKT-0001',
+      title: 'Falla',
+      reporterId: 'u1',
+      assigneeId: 'ag',
+    });
+    (notifications.enqueue as jest.Mock).mockRejectedValue(new Error('SQS down'));
+
+    const r = await svc.assign('t1', { assigneeId: 'ag', expectedVersion: 0 }, admin);
+    expect(r.assigneeId).toBe('ag');
+  });
+
+  it('reportante con notifyEmail=false NO recibe correo', async () => {
+    const { svc, prisma, users, notifications } = setup();
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'u1',
+      email: 'reporter@b.c',
+      notifyEmail: false,
+      notifySlack: false,
+      slackUserId: null,
+    });
+    (prisma.ticket.findUnique as jest.Mock).mockResolvedValue({ id: 't1', version: 0 });
+    (users.findById as jest.Mock).mockResolvedValue({ id: 'ag', role: Role.agente });
+    (prisma.ticket.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    (prisma.ticket.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+      id: 't1',
+      ticketNumber: 'TKT-0001',
+      title: 'Falla',
+      reporterId: 'u1',
+      assigneeId: 'ag',
+    });
+
+    await svc.assign('t1', { assigneeId: 'ag', expectedVersion: 0 }, admin);
+    expect(notifications.enqueue).not.toHaveBeenCalled();
   });
 
   it('422 si el assignee no es agente/admin', async () => {
@@ -209,6 +282,48 @@ describe('TicketsService.changeState', () => {
       agent,
     );
     expect(r.status).toBe('en_progreso');
+  });
+
+  it('resolver encola correo ticket.resolved al reportante; en_progreso NO', async () => {
+    const { svc, prisma, notifications } = setup();
+    (prisma.ticket.findUnique as jest.Mock).mockResolvedValue({
+      ...openAssigned,
+      status: 'en_progreso',
+    });
+    (prisma.ticket.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    (prisma.ticket.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+      id: 't1',
+      ticketNumber: 'TKT-0001',
+      title: 'Falla',
+      reporterId: 'u1',
+      status: 'resuelto',
+      solution: 'Reinicio del servicio',
+    });
+
+    await svc.changeState(
+      't1',
+      { targetState: 'resuelto', expectedVersion: 0, rootCause: 'rc', solution: 'sol' },
+      agent,
+    );
+    expect(notifications.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'ticket.resolved',
+        ticketId: 't1',
+        recipientEmail: 'reporter@b.c',
+      }),
+    );
+  });
+
+  it('una transición a en_progreso NO encola correo', async () => {
+    const { svc, prisma, notifications } = setup();
+    (prisma.ticket.findUnique as jest.Mock).mockResolvedValue(openAssigned);
+    (prisma.ticket.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    (prisma.ticket.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+      ...openAssigned,
+      status: 'en_progreso',
+    });
+    await svc.changeState('t1', { targetState: 'en_progreso', expectedVersion: 0 }, agent);
+    expect(notifications.enqueue).not.toHaveBeenCalled();
   });
 
   it('resolver sin root_cause/solution → 400', async () => {

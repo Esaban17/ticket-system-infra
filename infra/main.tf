@@ -176,6 +176,10 @@ module "iam" {
   secret_arn  = module.secrets.secret_arn
   kms_key_arn = module.kms.key_arn
 
+  # EP-12 / BL-119: scope ses:SendEmail/SendRawEmail (app + consumer IRSA) a la
+  # EXACTA identidad de email verificada (sin wildcard).
+  ses_identity_arn = module.ses.identity_arn
+
   # target_lambda_arn left empty: iam composes it by name to avoid the
   # iam <-> compute dependency cycle.
 }
@@ -333,6 +337,18 @@ module "container_insights" {
 # Wired into the ingress module (producer SQS URL + consumer IRSA) and the
 # keda module (queue ARN for scaling metric). See ADR 0010.
 
+# ---- SES (EP-12 / BL-119) -------------------------------------------------
+# Identidad de email verificada para los correos de notificación de tickets
+# (resuelto/comentado/asignado) que el sistema envía al reportante. Identidad de
+# email (no de dominio) = sin DNS, válida para el modo sandbox de SES. La
+# verificación del buzón es un paso manual fuera de Terraform.
+
+module "ses" {
+  source = "./modules/ses"
+
+  notification_email = var.notification_email
+}
+
 module "async" {
   source = "./modules/async"
 
@@ -400,6 +416,10 @@ module "ingress" {
   # D4: wire the SQS queue into the app ConfigMap (SQS_QUEUE_URL) and IRSA.
   sqs_queue_arn = module.async.queue_arn
   sqs_queue_url = module.async.queue_url
+
+  # EP-12 / BL-119: remitente verificado de SES inyectado en el ConfigMap
+  # (SES_FROM_ADDRESS), consumido por el app y el consumer (DispatchService).
+  ses_from_address = module.ses.from_address
 
   # D5: app/consumer IAM policies centralized in module.iam; attached to the
   # IRSA roles created here.
