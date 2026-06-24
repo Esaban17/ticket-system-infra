@@ -38,9 +38,25 @@ locals {
   # from the (deterministic) function name lets iam run first.
   target_lambda_arn = "arn:aws:lambda:${local.region}:${local.account_id}:function:${var.function_name}"
 
-  # Prefix-scoped IAM resource ARNs for the CI runner (no Resource="*").
-  ci_iam_role_arns   = "arn:aws:iam::${local.account_id}:role/${var.name_prefix}-*"
-  ci_iam_policy_arns = "arn:aws:iam::${local.account_id}:policy/${var.name_prefix}-*"
+  # Scoped IAM resource ARNs the CI runner may manage (no Resource="*"). Besides
+  # the project's own prefix, the terraform-aws-modules/eks community module
+  # creates IAM with NON-project names: the managed node group role
+  # (default-eks-node-group-*), node-group instance profiles, and the cluster's
+  # own OIDC provider (oidc.eks.<region>.amazonaws.com/...). Those patterns are
+  # listed explicitly so the CI apply works WITHOUT granting iam:* on "*".
+  ci_iam_role_arns = [
+    "arn:aws:iam::${local.account_id}:role/${var.name_prefix}-*",
+    "arn:aws:iam::${local.account_id}:role/default-eks-node-group-*",
+  ]
+  ci_iam_policy_arns = [
+    "arn:aws:iam::${local.account_id}:policy/${var.name_prefix}-*",
+  ]
+  ci_iam_instance_profile_arns = [
+    "arn:aws:iam::${local.account_id}:instance-profile/${var.name_prefix}-*",
+    "arn:aws:iam::${local.account_id}:instance-profile/default-eks-node-group-*",
+    "arn:aws:iam::${local.account_id}:instance-profile/eks-*",
+  ]
+  ci_eks_oidc_provider_arn = "arn:aws:iam::${local.account_id}:oidc-provider/oidc.eks.${local.region}.amazonaws.com/*"
 }
 
 # ===========================================================================
@@ -420,22 +436,50 @@ data "aws_iam_policy_document" "ci_runner_iam" {
       "iam:TagPolicy",
       "iam:UntagPolicy",
       "iam:ListInstanceProfilesForRole",
+      "iam:CreateInstanceProfile",
+      "iam:GetInstanceProfile",
+      "iam:DeleteInstanceProfile",
+      "iam:AddRoleToInstanceProfile",
+      "iam:RemoveRoleFromInstanceProfile",
+      "iam:TagInstanceProfile",
+      "iam:UntagInstanceProfile",
     ]
-    resources = [
+    resources = concat(
       local.ci_iam_role_arns,
       local.ci_iam_policy_arns,
-    ]
+      local.ci_iam_instance_profile_arns,
+    )
   }
 
-  # The OIDC provider is referenced via data source (account-global, shared), so
-  # CI only needs to READ it (terraform data lookup), never create/delete it.
+  # The EKS module provisions the CLUSTER's own OIDC provider (used for IRSA),
+  # distinct from the GitHub Actions provider. Scoped to the EKS issuer host.
   statement {
-    sid    = "ReadGithubOidcProvider"
+    sid    = "ManageEksClusterOidcProvider"
+    effect = "Allow"
+    actions = [
+      "iam:CreateOpenIDConnectProvider",
+      "iam:DeleteOpenIDConnectProvider",
+      "iam:TagOpenIDConnectProvider",
+      "iam:UntagOpenIDConnectProvider",
+      "iam:UpdateOpenIDConnectProviderThumbprint",
+      "iam:AddClientIDToOpenIDConnectProvider",
+    ]
+    resources = [local.ci_eks_oidc_provider_arn]
+  }
+
+  # Read access to OIDC providers (the GitHub provider data source lookup + the
+  # EKS provider). GetOpenIDConnectProvider is not resource-scopable to a useful
+  # narrower set across both providers, so it is granted on the two ARNs.
+  statement {
+    sid    = "ReadOidcProviders"
     effect = "Allow"
     actions = [
       "iam:GetOpenIDConnectProvider",
     ]
-    resources = [data.aws_iam_openid_connect_provider.github.arn]
+    resources = [
+      data.aws_iam_openid_connect_provider.github.arn,
+      local.ci_eks_oidc_provider_arn,
+    ]
   }
 }
 
