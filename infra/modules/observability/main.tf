@@ -83,6 +83,67 @@ resource "aws_sns_topic_subscription" "email" {
   endpoint  = var.alert_email
 }
 
+# ---- SNS topic access policy ----------------------------------------------
+# AWS Budgets validates the topic's access policy at budget-creation time: it
+# must allow budgets.amazonaws.com to SNS:Publish, or `terraform apply` fails
+# with "Unable to verify access for SNS topic". CloudWatch alarms also publish
+# here. Both are scoped with aws:SourceAccount (and the budget with SourceArn)
+# so only this account's budgets/alarms can publish (no open principal).
+
+data "aws_caller_identity" "current" {}
+data "aws_partition" "current" {}
+
+data "aws_iam_policy_document" "alerts_topic" {
+  statement {
+    sid     = "AllowBudgetsPublish"
+    effect  = "Allow"
+    actions = ["SNS:Publish"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["budgets.amazonaws.com"]
+    }
+
+    resources = [aws_sns_topic.alerts.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:${data.aws_partition.current.partition}:budgets::${data.aws_caller_identity.current.account_id}:budget/*"]
+    }
+  }
+
+  statement {
+    sid     = "AllowCloudWatchAlarmsPublish"
+    effect  = "Allow"
+    actions = ["SNS:Publish"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+
+    resources = [aws_sns_topic.alerts.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "alerts" {
+  arn    = aws_sns_topic.alerts.arn
+  policy = data.aws_iam_policy_document.alerts_topic.json
+}
+
 # ---- CloudWatch alarms -----------------------------------------------------
 # Both alarms route to the SNS topic on breach. Thresholds, period and
 # evaluation_periods are all inputs (no hardcoded numbers).
