@@ -134,34 +134,33 @@ resource "aws_iam_role_policy" "lambda_s3" {
 #     an object data key. Reubicado desde el módulo compute (D5-B se construyó
 #     sobre la estructura pre-A); ahora vive aquí junto al resto de los grants.
 data "aws_iam_policy_document" "lambda_secrets" {
-  count = var.secret_arn != "" || var.kms_key_arn != "" ? 1 : 0
+  # Gate on the STATIC bool, not on (secret_arn != "" || kms_key_arn != ""):
+  # those ARNs are module outputs that are "known after apply" during the
+  # two-phase -target apply, which makes count/for_each unpredictable and aborts
+  # the plan. The root always wires both when secrets are enabled, so a static
+  # flag is equivalent and resolvable at plan time.
+  count = var.secrets_access_enabled ? 1 : 0
 
-  dynamic "statement" {
-    for_each = var.secret_arn != "" ? [1] : []
-    content {
-      sid       = "AllowReadDbCredentialsSecret"
-      effect    = "Allow"
-      actions   = ["secretsmanager:GetSecretValue"]
-      resources = [var.secret_arn]
-    }
+  statement {
+    sid       = "AllowReadDbCredentialsSecret"
+    effect    = "Allow"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [var.secret_arn]
   }
 
-  dynamic "statement" {
-    for_each = var.kms_key_arn != "" ? [1] : []
-    content {
-      sid    = "AllowDecryptAndGenerateDataKey"
-      effect = "Allow"
-      actions = [
-        "kms:Decrypt",
-        "kms:GenerateDataKey",
-      ]
-      resources = [var.kms_key_arn]
-    }
+  statement {
+    sid    = "AllowDecryptAndGenerateDataKey"
+    effect = "Allow"
+    actions = [
+      "kms:Decrypt",
+      "kms:GenerateDataKey",
+    ]
+    resources = [var.kms_key_arn]
   }
 }
 
 resource "aws_iam_role_policy" "lambda_secrets" {
-  count  = var.secret_arn != "" || var.kms_key_arn != "" ? 1 : 0
+  count  = var.secrets_access_enabled ? 1 : 0
   name   = "${var.function_name}-secrets-kms"
   role   = aws_iam_role.lambda_exec.id
   policy = data.aws_iam_policy_document.lambda_secrets[0].json
@@ -254,8 +253,10 @@ data "aws_iam_policy_document" "app_s3" {
   # runtime via IRSA. secretsmanager:GetSecretValue scoped to the EXACT secret
   # ARN (no wildcard) and kms:Decrypt scoped to the EXACT CMK ARN to unwrap the
   # ciphertext. Each statement is gated on its ARN being set (backward-compatible).
+  # Gated on the STATIC bool (not the apply-time ARN values) so the for_each is
+  # resolvable at plan time during the two-phase -target apply.
   dynamic "statement" {
-    for_each = var.secret_arn != "" ? [1] : []
+    for_each = var.secrets_access_enabled ? [1] : []
     content {
       sid       = "AllowReadDbCredentialsSecret"
       effect    = "Allow"
@@ -265,7 +266,7 @@ data "aws_iam_policy_document" "app_s3" {
   }
 
   dynamic "statement" {
-    for_each = var.kms_key_arn != "" ? [1] : []
+    for_each = var.secrets_access_enabled ? [1] : []
     content {
       sid       = "AllowDecryptWithCmk"
       effect    = "Allow"
@@ -349,7 +350,12 @@ resource "aws_iam_policy" "consumer" {
 # trust is established by the ci_runner role's assume_role_policy below. See
 # docs/iac-coverage.md for the rationale.
 data "aws_iam_openid_connect_provider" "github" {
-  url = "https://token.actions.githubusercontent.com"
+  # By ARN, NOT url: a url-lookup calls iam:ListOpenIDConnectProviders (account-
+  # wide, oidc-provider/*) which the CI runner lacks — and that read happens at
+  # PLAN time, before any apply could widen the policy (chicken-and-egg). An
+  # ARN-lookup uses iam:GetOpenIDConnectProvider, which the runner DOES have on
+  # this exact ARN. The GitHub provider ARN is deterministic for the account.
+  arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
 }
 
 # Trust policy: federated to the GitHub OIDC provider, locked to the specific

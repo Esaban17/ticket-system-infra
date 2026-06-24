@@ -176,6 +176,11 @@ module "iam" {
   secret_arn  = module.secrets.secret_arn
   kms_key_arn = module.kms.key_arn
 
+  # Static flag (resolvable at plan time) that turns the secret/KMS data-plane
+  # statements on — the ARNs above are known-after-apply during the two-phase
+  # -target apply, so the policy count/for_each gate on this bool, not the ARNs.
+  secrets_access_enabled = true
+
   # EP-12 / BL-119: scope ses:SendEmail/SendRawEmail (app + consumer IRSA) a la
   # EXACTA identidad de email verificada (sin wildcard).
   ses_identity_arn = module.ses.identity_arn
