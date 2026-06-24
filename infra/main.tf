@@ -285,6 +285,14 @@ module "eks" {
   node_desired_size       = var.eks_node_desired_size
   node_instance_types     = var.eks_node_instance_types
   environment             = var.environment
+
+  # Order guarantee for the cold-start CI apply: the EKS module creates IAM with
+  # non-project names (node group role, cluster OIDC provider). The CI runner's
+  # broad IAM grant (AdministratorAccess + inline) lives in module.iam, and on a
+  # fresh apply terraform would otherwise race — creating the node group role
+  # BEFORE the CI runner's policy is widened, hitting AccessDenied. Waiting on
+  # module.iam ensures the runner has the permissions before EKS provisions IAM.
+  depends_on = [module.iam]
 }
 
 # ---- ALB Controller (Deliverable C prerequisite) -------------------------
