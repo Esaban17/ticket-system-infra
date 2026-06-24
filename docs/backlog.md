@@ -92,6 +92,7 @@ Orden = secuencia recomendada de ataque, no estricta. Dependencias explícitas e
 | **EP-18** | Observabilidad — métricas, logs estructurados, dashboards, alarmas | mixto | transversal · presentable en D4/D5 | todos | — | EP-04, EP-11 |
 | **EP-19** | CI/CD — pipeline de build, test, deploy de API e infra | infra | transversal | — | — | EP-01, EP-08 |
 | **EP-20** | Documentación de entregas D3, D4, D5 (incluye anexo IA, RFCs, ADRs) | docs | D3, D4, D5 | — | varias (formaliza cierres) | cada épica de su entrega |
+| **EP-21** | Delivery 5 — Seguridad, Observabilidad y One-Click Deployment (entregables A–J de la rúbrica) | mixto | **D5** | todos | — | EP-14, EP-15, EP-18, EP-19 |
 
 ### Cobertura de componentes del curso
 
@@ -2059,6 +2060,283 @@ Cobertura completa; ningún componente queda sin épica.
 ### Épica EP-20 — Documentación de entregas (placeholder)
 
 Items detallados se redactan al cerrar cada entrega (D3, D4, D5). Cada entrega actualiza el documento vivo del proyecto (`docs/TicketSystem.md`) con cambios, decisiones, RFCs cerradas y Anexo IA. Las versiones anteriores quedan inmutables en git history bajo los tags `inube-entrega-N`. No se crean archivos hermanos `EN_TicketSystem.md`.
+
+---
+
+### Épica EP-21 — Delivery 5: Seguridad, Observabilidad y One-Click Deployment
+
+Esta épica mapea **1:1 con la rúbrica oficial del Delivery 5** (entregables A–J). El tag calificado es `oyd-delivery-5` (deadline 25-jun-2026 EoD). Cada item se entrega como una PR independiente contra la rama integradora `feat/delivery-5`. Donde un entregable extiende trabajo ya existente, se referencia el item previo (EP-15 secretos, EP-18 observabilidad, EP-19 CI/CD).
+
+Rango `BL-201..BL-214`. Pesos entre paréntesis = puntos internos de la rúbrica (se normalizan a 8 pts; opcionales suman extra).
+
+#### BL-201 — Deliverable A: módulo `modules/iam` centralizado sin wildcards (13)
+
+| Campo | Valor |
+|---|---|
+| Área | infra |
+| Entrega | D5 |
+| Componente curso | Seguridad |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Estuardo |
+| Tamaño | L |
+| Depende de | — |
+
+**Descripción.** Crear `infra/modules/iam/{main,variables,outputs}.tf` consolidando ≥4 roles: ejecución de Lambda (movido de `modules/compute`), scheduler (movido de `modules/scheduler`), políticas de app y consumer (movidas de `modules/ingress/iam.tf`) y el rol CI runner OIDC (BL-205). Sin `Action="*"` ni `Resource="*"` en ninguna sentencia. El trust/IRSA de app y consumer permanece en `ingress` (módulo comunitario `iam-role-for-service-accounts-eks`) para no romper las anotaciones `eks.amazonaws.com/role-arn`; solo se centraliza la autoría de las políticas, que se pasan por variable. Todos los role/policy ARNs como outputs consumidos por los módulos referenciadores (ninguno hardcoded).
+
+**Definición de listo:**
+- `terraform validate` ok; `terraform plan` muestra roles y policies sin wildcards.
+- `infra/evidence/iam-plan.txt` con el excerpt del plan, renderizado en `infra/README.md`.
+- Pods de app/consumer no se reinician por cambio de IRSA (solo se mueve autoría de policy).
+
+#### BL-202 — Deliverable B (1/3): módulo `modules/kms` (CMK + key policy restringida) (12)
+
+| Campo | Valor |
+|---|---|
+| Área | infra |
+| Entrega | D5 |
+| Componente curso | Seguridad |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Estuardo |
+| Tamaño | M |
+| Depende de | BL-201 |
+
+**Descripción.** `aws_kms_key.main` (`enable_key_rotation=true`) + `aws_kms_alias`. Key policy restringida: admin a root **con condición** (no `kms:*` abierto), service principal `secretsmanager.amazonaws.com`, y `kms:Decrypt`/`GenerateDataKey` solo para el lambda exec role + app IRSA ARN (de BL-201). Key id/alias como variables. Reemplaza EP-15 a nivel de cifrado.
+
+**Definición de listo:**
+- `terraform output` expone el ARN del CMK.
+- La key policy no contiene grants a `*` ni a root sin condición.
+
+#### BL-203 — Deliverable B (2/3): `modules/secrets` + cifrado CMK en S3 y RDS (12)
+
+| Campo | Valor |
+|---|---|
+| Área | infra |
+| Entrega | D5 |
+| Componente curso | Seguridad / Almacenamiento |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Estuardo |
+| Tamaño | M |
+| Depende de | BL-202 |
+
+**Descripción.** `random_password.db` → `aws_secretsmanager_secret` (`kms_key_id=CMK`) → `aws_secretsmanager_secret_version` con `jsonencode({username,password,host,port,dbname})`. `storage/main.tf` cambia SSE `AES256`→`aws:kms` (+`bucket_key_enabled`); `database/main.tf` añade `kms_key_id`. En el root, `var.db_password` pasa a `default=null` y se usa `coalesce(var.db_password, random_password.db.result)`. Cierra EP-15 (BL formales de secretos).
+
+**Definición de listo:**
+- `infra/evidence/secrets-kms.txt` (terraform output del ARN del secret + CMK), renderizado en README.
+- `secrets-console.png` del secret en consola.
+- S3 y RDS muestran cifrado con el CMK (no AES256 / no AWS-managed).
+
+#### BL-204 — Deliverable B (3/3): API NestJS lee el secret en runtime (`GetSecretValue`) (12)
+
+| Campo | Valor |
+|---|---|
+| Área | dev |
+| Entrega | D5 |
+| Componente curso | Seguridad |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Luis André |
+| Tamaño | M |
+| Depende de | BL-203 |
+
+**Descripción.** Añadir `@aws-sdk/client-secrets-manager`; crear `app/api/src/config/secret-loader.ts` que en `main.ts` (y en el worker + seed Job) hace `GetSecretValue` ANTES de `bootstrap()` usando credenciales IRSA del entorno (patrón de `s3-presign.service.ts`), arma `DATABASE_URL` y lo setea en `process.env`. El ConfigMap inyecta `SECRET_ARN` (no el password). `env.validation.ts` hace `DATABASE_URL` opcional si hay `SECRET_ARN`. Se retira `TF_VAR_db_password` del CI. IRSA de app/consumer gana `secretsmanager:GetSecretValue` + `kms:Decrypt` (ARNs exactos).
+
+**Definición de listo:**
+- `npm run build && npm test` verdes en `app/api`.
+- El pod arranca leyendo el secret (log de arranque sin el password en claro).
+- `TF_VAR_DB_PASSWORD` ya no existe en GitHub Secrets.
+
+#### BL-205 — Deliverable C (1/2): OIDC provider GitHub + rol CI runner (12)
+
+| Campo | Valor |
+|---|---|
+| Área | infra |
+| Entrega | D5 |
+| Componente curso | Seguridad / DevOps |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Estuardo |
+| Tamaño | M |
+| Depende de | BL-201 |
+
+**Descripción.** En `modules/iam`: `aws_iam_openid_connect_provider.github` (`token.actions.githubusercontent.com`, aud `sts.amazonaws.com`) + `aws_iam_role.ci_runner` con trust policy scoped a `repo:gitcombo/ticket-system-infra:ref:refs/heads/main`. Permisos del runner para `terraform plan/apply` (documentar trade-off de amplitud). Extiende EP-19.
+
+**Definición de listo:**
+- El OIDC provider y el rol existen en el state (primer apply con keys long-lived aún activas).
+- Trust policy NO acepta cualquier subject (scoped a la rama main del repo).
+
+#### BL-206 — Deliverable C (2/2): migrar los 6 workflows a `role-to-assume` (12)
+
+| Campo | Valor |
+|---|---|
+| Área | infra |
+| Entrega | D5 |
+| Componente curso | DevOps |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Estuardo |
+| Tamaño | S |
+| Depende de | BL-205 |
+
+**Descripción.** Editar `terraform-apply.yml` (3 jobs), `terraform-ci.yml`, `terraform-drift.yml`, `terraform-destroy.yml`, `api-deploy.yml`, `web-deploy.yml`: quitar `aws-access-key-id`/`aws-secret-access-key`, usar `role-to-assume: ${{ vars.CI_RUNNER_ROLE_ARN }}` + `permissions: { id-token: write, contents: read }`. ARN vía GitHub Actions Variable (no hardcode). Acción humana: crear la Variable, borrar los secrets long-lived, documentar el borrado en el summary.
+
+**Definición de listo:**
+- `oidc-auth-log.png` (run con intercambio OIDC ok) y `oidc-secrets-removed.png`, renderizados en README.
+- Ningún workflow referencia `AWS_ACCESS_KEY_ID`.
+
+#### BL-207 — Deliverable D: verificación y evidencia TLS (8)
+
+| Campo | Valor |
+|---|---|
+| Área | infra |
+| Entrega | D5 |
+| Componente curso | Seguridad / Red |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Estuardo |
+| Tamaño | S |
+| Depende de | — |
+
+**Descripción.** TLS ya implementado (`modules/tls`, `enable_https=true`, listener 443 + ssl-redirect 301, un solo Ingress cubre web `/` y api `/v1`). Falta: completar `description` de variables TLS y generar evidencia. Cierra el deferred de D3.
+
+**Definición de listo:**
+- `infra/evidence/tls-curl.txt`: `curl -i https://tickets.nextcodegt.com/healthz` (200 + subject del cert) y `curl -i http://...` (301).
+- `kubectl describe ingress -n ticket-system` mostrando `certificate-arn` + `ssl-redirect`.
+
+#### BL-208 — Deliverable E: expandir `modules/observability` + cablear al root (15)
+
+| Campo | Valor |
+|---|---|
+| Área | infra |
+| Entrega | D5 |
+| Componente curso | Observabilidad / Costo |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Pareo |
+| Tamaño | L |
+| Depende de | BL-203 |
+
+**Descripción.** Extiende BL-132/133/134 (EP-18) a un módulo reutilizable completo: ≥2 `aws_cloudwatch_metric_alarm` (Lambda errors, SQS DLQ depth) → `aws_sns_topic` + `aws_sns_topic_subscription` email; `aws_cloudwatch_dashboard` con ≥3 widgets vía `jsonencode()`; `aws_budgets_budget` con threshold 80% y `var.monthly_budget_usd`. Cablear `module "observability"` al root (hoy NO lo está) con `kms_key_arn=module.kms.key_arn` y todos los inputs desde variables. Ampliar la validation de `environment` para incluir `staging`.
+
+**Definición de listo:**
+- `observability-outputs.txt` (log group + alarm ARNs), `dashboard.png`, `budget.png` renderizados en README.
+- Suscripción de email SNS confirmada (acción humana).
+
+#### BL-209 — Deliverable I (OBLIGATORIO): `iac-coverage.md` + state list (10)
+
+| Campo | Valor |
+|---|---|
+| Área | docs |
+| Entrega | D5 |
+| Componente curso | DevOps |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Estuardo |
+| Tamaño | M |
+| Depende de | — |
+
+**Descripción.** `infra/docs/iac-coverage.md` (archivo SEPARADO del summary): tabla `Application Component | Cloud Service | Terraform Resource Type | Module Path`, una fila por recurso, cubriendo las 7 categorías (compute, storage, database, networking, async, security/IAM, observability) + declaración explícita de "sin recursos manuales". `infra/evidence/state-list.txt` (`terraform state list`).
+
+**Definición de listo:**
+- Cada fila de `iac-coverage.md` aparece en `state-list.txt`.
+- `deployed-components.png` (consola con recursos running) renderizado en README.
+
+#### BL-210 — Deliverable F (1/2): Runbook + two-phase `apply-dev` (12)
+
+| Campo | Valor |
+|---|---|
+| Área | infra |
+| Entrega | D5 |
+| Componente curso | DevOps |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Estuardo |
+| Tamaño | M |
+| Depende de | BL-201, BL-203, BL-206, BL-208 |
+
+**Descripción.** Sección `## Runbook` en `infra/README.md` (4 sub-pasos: permisos de cuenta, GitHub Environments/secrets, comandos `git clone`/`git push`, verificación con `terraform output`). Replicar el patrón two-phase de `apply-staging` en `apply-dev` para que el cold-start funcione (los providers `kubernetes`/`helm` no conectan a un cluster inexistente en un solo plan).
+
+**Definición de listo:**
+- README contiene `## Runbook` con los 4 sub-pasos.
+- `apply-dev` aplica desde cero (cluster inexistente) sin error de provider.
+
+#### BL-211 — `delivery-5-summary.md` + sección `## Evidence` en README (10 + Code Quality 8)
+
+| Campo | Valor |
+|---|---|
+| Área | docs |
+| Entrega | D5 |
+| Componente curso | Documentación |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Pareo |
+| Tamaño | M |
+| Depende de | BL-201..BL-210 |
+
+**Descripción.** `infra/docs/delivery-5-summary.md` con los 5 puntos requeridos (estructura IAM + retrieval runtime de secretos; CMK con ARN real; subject claim OIDC + confirmación de borrado de keys; thresholds de alarmas + widgets + budget; 2 trade-offs). Sección `## Evidence` en `infra/README.md` renderizando todos los artefactos. Code Quality: módulos con main/variables/outputs separados, descriptions, sin hardcode.
+
+**Definición de listo:**
+- Los 5 puntos del summary referencian la infra real (ARNs, thresholds concretos).
+- `iac-coverage.md` NO está fusionado con el summary.
+
+#### BL-212 — Deliverable G (opcional): monitoring stack Container Insights (+25)
+
+| Campo | Valor |
+|---|---|
+| Área | infra |
+| Entrega | D5 |
+| Componente curso | Observabilidad |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Estuardo |
+| Tamaño | M |
+| Depende de | EP-09 (EKS), BL-201 |
+
+**Descripción.** IRSA del cluster ya existe (app/consumer/ALB/KEDA). Falta el monitoring stack vía `helm_release` con chart version como variable. Recomendado: CloudWatch Container Insights (`modules/container-insights`: `aws-cloudwatch-metrics` + `aws-for-fluent-bit`) por footprint, sobre kube-prometheus-stack (no cabe cómodo en t3.medium desired=1).
+
+**Definición de listo:**
+- `irsa-sa.png` (SA con `eks.amazonaws.com/role-arn`) y `eks-monitoring.png` (métricas activas) en README.
+- Chart version es variable (no hardcoded).
+
+#### BL-213 — Deliverable J (opcional): Slack bot `/deploy <env>` (repo separado) (+25)
+
+| Campo | Valor |
+|---|---|
+| Área | dev |
+| Entrega | D5 |
+| Componente curso | DevOps |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Luis André |
+| Tamaño | L |
+| Depende de | BL-206 |
+
+**Descripción.** Repo separado (público o compartido con graders). Node + `@slack/bolt` + `@octokit/rest`: `/deploy <env>` → `workflow_dispatch` API de `terraform-apply.yml`, mensaje con env + run URL + timestamp, rechazo de envs no reconocidos, token en secrets de la plataforma (no hardcoded). README propio + link en el summary. Deploy en cloud function free-tier o local con ngrok para la demo.
+
+**Definición de listo:**
+- `bot-command.png` (slash command + respuesta) y `bot-pipeline-run.png` (run disparado por token) en README.
+- `/deploy invalido` devuelve error claro.
+
+#### BL-214 — Deliverable F (2/2): ejecución one-click (destroy + redeploy + idempotencia)
+
+| Campo | Valor |
+|---|---|
+| Área | infra |
+| Entrega | D5 |
+| Componente curso | DevOps |
+| CUs | — |
+| Qs que cierra | — |
+| Owner | Estuardo |
+| Tamaño | M |
+| Depende de | BL-210, BL-211 |
+
+**Descripción.** Ejecución viva (acción humana vía GitHub Actions): `terraform destroy` del workspace main (NO `infra/bootstrap/`) → push a main → pipeline init/plan/apply → 7 componentes running → segundo push sin cambios → `terraform plan -detailed-exitcode == 0`.
+
+**Definición de listo:**
+- `clean-state-pipeline.png` (jobs en verde desde estado limpio), `terraform-output-full.txt` (7 componentes), `idempotent-plan.txt` (exit code 0) en README.
+- Tag `oyd-delivery-5` pusheado sobre el commit final.
 
 ---
 
