@@ -76,6 +76,11 @@ scheduler_timezone   = "UTC"
 alert_email        = "ops@nextcodegt.com"
 monthly_budget_usd = 300
 
+# Notificaciones por email (EP-12 / BL-119) — identidad de email verificada en
+# SES (sandbox, sin DNS). Remitente/destinatario de prueba de los correos de
+# ticket. Verificar el buzón manualmente tras el apply.
+notification_email = "estuardo1314@gmail.com"
+
 # Image tags — pinned to the images currently running in the cluster.
 # 6b2bc63 = merge de #77 (Cognito + adjuntos + todo lo previo), desplegado el
 # 2026-06-23. Mantener el pin sincronizado con el último deploy evita que un

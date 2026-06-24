@@ -6,6 +6,14 @@ import { parseMessage, NotificationMessage } from './notification-message';
 import { NotificationsService } from './notifications.service';
 import { DispatchService } from './dispatch.service';
 
+// BL-119: mock del SDK de SES para no tocar AWS. La variable lleva prefijo
+// `mock` para que jest permita referenciarla dentro del factory hoisteado.
+const mockSesSend = jest.fn().mockResolvedValue({ MessageId: 'ses-1' });
+jest.mock('@aws-sdk/client-ses', () => ({
+  SESClient: jest.fn().mockImplementation(() => ({ send: mockSesSend })),
+  SendEmailCommand: jest.fn().mockImplementation((input) => ({ input })),
+}));
+
 const baseUser = {
   notifyEmail: true,
   notifySlack: false,
@@ -96,5 +104,31 @@ describe('DispatchService (stub BL-035)', () => {
     const d = new DispatchService();
     await expect(d.sendEmail('a@b.c', { subject: 's', body: 'b' })).resolves.toBeUndefined();
     await expect(d.sendSlack('U1', { text: 't' })).resolves.toBeUndefined();
+  });
+});
+
+// BL-119: cuando SES_FROM_ADDRESS está configurado, sendEmail debe enviar el
+// correo REAL vía SESClient.send(SendEmailCommand). Verificamos que se llama con
+// el remitente y destinatario correctos sin tocar AWS (SDK mockeado arriba).
+describe('DispatchService (SES real, BL-119)', () => {
+  const ORIGINAL = process.env.SES_FROM_ADDRESS;
+  beforeEach(() => {
+    mockSesSend.mockClear();
+    process.env.SES_FROM_ADDRESS = 'noreply@example.com';
+  });
+  afterAll(() => {
+    if (ORIGINAL === undefined) delete process.env.SES_FROM_ADDRESS;
+    else process.env.SES_FROM_ADDRESS = ORIGINAL;
+  });
+
+  it('sendEmail invoca SESClient.send con Source=SES_FROM_ADDRESS y destinatario', async () => {
+    // Instancia DENTRO del test para que el constructor lea el env ya seteado.
+    const d = new DispatchService();
+    await d.sendEmail('reporter@b.c', { subject: 'Asunto', body: 'Cuerpo' });
+    expect(mockSesSend).toHaveBeenCalledTimes(1);
+    const cmd = mockSesSend.mock.calls[0][0];
+    expect(cmd.input.Source).toBe('noreply@example.com');
+    expect(cmd.input.Destination.ToAddresses).toEqual(['reporter@b.c']);
+    expect(cmd.input.Message.Subject.Data).toBe('Asunto');
   });
 });

@@ -185,6 +185,14 @@ variable "polling_batch_size" {
   default     = 10
 }
 
+# ---- Notificaciones por email (EP-12 / BL-119) -----------------------------
+
+variable "ses_from_address" {
+  description = "Dirección verificada en SES usada como remitente de los correos de notificación de tickets (de module.ses.from_address). Se inyecta como SES_FROM_ADDRESS en el ConfigMap compartido por el app y el consumer; el DispatchService la usa como Source en SendEmail. Vacío ('') = el app conserva el comportamiento stub (solo loguea) y no se inyecta la clave."
+  type        = string
+  default     = ""
+}
+
 # ---- Auth / Cognito (EP-14) — fluyen al ConfigMap del API ------------------
 
 variable "auth_provider" {

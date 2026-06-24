@@ -58,6 +58,12 @@ variable "kms_key_arn" {
   default     = ""
 }
 
+variable "ses_identity_arn" {
+  description = "ARN de la identidad de email de SES (de module.ses.identity_arn). Cuando está seteado, las políticas IRSA del app y del consumer reciben ses:SendEmail + ses:SendRawEmail scoped a ESTA identidad (sin wildcards) para enviar los correos de notificación de tickets (EP-12 / BL-119). Vacío ('') omite el statement (backward-compatible)."
+  type        = string
+  default     = ""
+}
+
 variable "github_org" {
   description = "GitHub organization/owner that owns the repository allowed to assume the CI runner role via OIDC. Used in the trust policy sub condition (repo:<org>/<repo>:ref:<branch_ref>). MUST be the repo's CURRENT owner as it appears in the GitHub Actions OIDC token sub claim — the 'gitcombo' remote URL is a redirect to the renamed owner 'Esaban17', and OIDC emits the current name."
   type        = string
