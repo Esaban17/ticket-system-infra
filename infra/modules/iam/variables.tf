@@ -58,6 +58,12 @@ variable "kms_key_arn" {
   default     = ""
 }
 
+variable "secrets_access_enabled" {
+  description = "Static flag that gates the Secrets Manager + KMS data-plane statements on the lambda_exec and app IRSA policies. Set true by the root when modules secrets/kms are wired. Used INSTEAD of checking secret_arn/kms_key_arn != \"\" so count/for_each resolve at plan time (the ARNs are known-after-apply during the two-phase -target apply). The exact ARNs are still used in the statement bodies (known-after-apply is fine there)."
+  type        = bool
+  default     = false
+}
+
 variable "ses_identity_arn" {
   description = "ARN de la identidad de email de SES (de module.ses.identity_arn). Cuando está seteado, las políticas IRSA del app y del consumer reciben ses:SendEmail + ses:SendRawEmail scoped a ESTA identidad (sin wildcards) para enviar los correos de notificación de tickets (EP-12 / BL-119). Vacío ('') omite el statement (backward-compatible)."
   type        = string
