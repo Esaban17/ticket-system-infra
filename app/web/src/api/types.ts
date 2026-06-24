@@ -118,6 +118,10 @@ export interface ListEventsParams {
   limit?: number;
 }
 
+export interface CreateCommentRequest {
+  message: string; // texto del comentario; no vacío (tras normalizar espacios)
+}
+
 export interface AssignTicketRequest {
   assigneeId: string;
   expectedVersion: number;
