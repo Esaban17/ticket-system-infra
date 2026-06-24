@@ -68,6 +68,10 @@ keda_queue_length_trigger = 5
 scheduler_expression = "rate(1 day)"
 scheduler_timezone   = "UTC"
 
+# Observability — Delivery 5, Deliverable E
+alert_email        = "ops@nextcodegt.com"
+monthly_budget_usd = 300
+
 # Image tags — pinned to the images currently running in the cluster.
 # 6b2bc63 = merge de #77 (Cognito + adjuntos + todo lo previo), desplegado el
 # 2026-06-23. Mantener el pin sincronizado con el último deploy evita que un

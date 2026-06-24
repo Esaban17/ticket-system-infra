@@ -222,3 +222,20 @@ output "tls_domain_validation" {
   description = "Registros CNAME a crear en Hostinger para validar el cert ACM (name → value)."
   value       = module.tls.domain_validation_options
 }
+
+# ---- Observability (Delivery 5 — Deliverable E) ---------------------------
+
+output "observability_alarm_arns" {
+  description = "Map of logical alarm name to CloudWatch metric alarm ARN (lambda-errors, sqs-dlq-depth). Both alarms notify the SNS alerts topic."
+  value       = module.observability.alarm_arns
+}
+
+output "observability_dashboard_name" {
+  description = "Name of the CloudWatch dashboard with the ALB request count, Lambda error rate and DLQ/RDS widgets."
+  value       = module.observability.dashboard_name
+}
+
+output "observability_sns_topic_arn" {
+  description = "ARN of the SNS alerts topic that fans out CloudWatch alarm and AWS Budgets notifications."
+  value       = module.observability.sns_topic_arn
+}
