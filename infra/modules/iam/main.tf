@@ -355,10 +355,18 @@ data "aws_iam_policy_document" "ci_runner_assume_role" {
       values   = ["sts.amazonaws.com"]
     }
 
+    # Push-to-main jobs present sub = repo:org/repo:ref:refs/heads/main. But jobs
+    # that target a GitHub Environment (apply-dev/apply-staging) present
+    # sub = repo:org/repo:environment:<env> INSTEAD of the ref. Allow both — a
+    # LIST of EXACT subjects scoped to this repo + main branch + the named
+    # environments (NOT a wildcard; a PR/fork/other-branch still cannot assume).
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.github_repo}:ref:${var.github_branch_ref}"]
+      values = concat(
+        ["repo:${var.github_org}/${var.github_repo}:ref:${var.github_branch_ref}"],
+        [for env in var.github_environments : "repo:${var.github_org}/${var.github_repo}:environment:${env}"],
+      )
     }
   }
 }

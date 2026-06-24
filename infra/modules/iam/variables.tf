@@ -82,6 +82,12 @@ variable "github_branch_ref" {
   default     = "refs/heads/main"
 }
 
+variable "github_environments" {
+  description = "GitHub Actions Environments whose jobs may assume the CI runner role. Jobs that target an Environment present an OIDC sub of repo:<org>/<repo>:environment:<env> INSTEAD of the branch ref, so each must be allowed explicitly (still scoped — not a wildcard). The two-phase apply uses dev (auto) and staging (gated)."
+  type        = list(string)
+  default     = ["dev", "staging"]
+}
+
 variable "tags" {
   description = "Tags applied to the IAM roles, policies and the OIDC provider created by this module."
   type        = map(string)
