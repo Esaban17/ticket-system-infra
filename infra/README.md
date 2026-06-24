@@ -35,19 +35,14 @@ export AWS_PROFILE=ticket-system-dev
 
 En el pipeline de CI las credenciales se inyectan como **GitHub Actions Encrypted Secrets** (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`). Ver sección de CI más abajo.
 
-### Password de la base de datos — `TF_VAR_db_password`
+### Password de la base de datos — Secrets Manager (Delivery 5)
 
-A partir de Delivery 2, el módulo `database` (RDS PostgreSQL) requiere una variable `db_password` marcada `sensitive = true`. **NUNCA** se commitea a `.tfvars` ni a `.tf`.
-
-Inyectarla vía variable de entorno antes de correr Terraform localmente:
+Desde **Delivery 5**, la contraseña de RDS ya **no** se inyecta por `TF_VAR_db_password`. El módulo `secrets` la **autogenera** (`random_password`), la guarda cifrada con el CMK en AWS Secrets Manager, y la API la lee en runtime vía `GetSecretValue` (ver `modules/secrets`, `modules/kms` y `docs/delivery-5-summary.md`). `var.db_password` quedó opcional (`default null`) solo como override; el secret de CI `TF_VAR_DB_PASSWORD` fue **retirado**.
 
 ```bash
-export TF_VAR_db_password='<password fuerte de ≥12 chars>'
-terraform plan  -var-file=envs/dev/dev.tfvars
+# Apply local (la contraseña se autogenera; no se exporta ningún secreto)
 terraform apply -var-file=envs/dev/dev.tfvars
 ```
-
-En CI, está configurada como GitHub Encrypted Secret `TF_VAR_DB_PASSWORD`.
 
 ---
 
@@ -178,20 +173,20 @@ push a main → plan-dev → [tfplan artifact] → apply-dev (env: dev, auto)
                                              apply-staging (env: staging, revisor: gitcombo)
 ```
 
-### Secrets requeridos
+### Autenticación y configuración de CI (Delivery 5 — OIDC, sin llaves long-lived)
 
-**A nivel de repositorio** (`Settings → Secrets → Actions`):
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_REGION` (`us-east-1`)
-- `TF_VAR_DB_PASSWORD` (contraseña de dev)
+Desde **Delivery 5** el CI se autentica con **OIDC** (federación GitHub→AWS); no hay credenciales long-lived. Ver `## Runbook` para el detalle.
 
-**GitHub Environment `staging`**:
-- `STAGING_DB_PASSWORD` (contraseña de staging, distinta de dev)
+**Variables de repositorio** (`Settings → Secrets and variables → Actions → Variables`):
+- `CI_RUNNER_ROLE_ARN` — output `ci_runner_role_arn` del módulo `iam` (rol OIDC).
+- `AWS_REGION` (`us-east-1`).
+- `INFRA_AUTO_APPLY` (`true`/`false`, kill-switch del pipeline).
+
+**Secrets de repositorio:** ninguno long-lived. `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` y `TF_VAR_DB_PASSWORD` fueron **eliminados** tras validar OIDC (la contraseña se autogenera en Secrets Manager).
 
 **GitHub Environments** (crear en UI `Settings → Environments`):
 - `dev` — sin revisor, auto-apply
-- `staging` — required reviewer: `gitcombo`
+- `staging` — required reviewer (gate de aprobación, ADR 0012)
 
 ---
 
