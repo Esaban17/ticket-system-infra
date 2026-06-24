@@ -64,6 +64,10 @@ keda_min_replica_count    = 0
 keda_max_replica_count    = 5
 keda_queue_length_trigger = 5
 
+# Container Insights — Delivery 5, Deliverable G (opcional)
+cloudwatch_metrics_chart_version = "0.0.11"
+fluent_bit_chart_version         = "0.1.34"
+
 # Scheduler — Delivery 4
 scheduler_expression = "rate(1 day)"
 scheduler_timezone   = "UTC"
