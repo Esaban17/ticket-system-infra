@@ -14,46 +14,14 @@
 # No wildcard resource ARNs anywhere (rubric requirement).
 # ---------------------------------------------------------------------------
 
+# NOTE (Delivery 5, Deliverable A): the app_s3 and consumer aws_iam_policy
+# resources (and their policy documents) were CENTRALIZED into ./modules/iam.
+# Their ARNs flow in via var.app_policy_arn / var.consumer_policy_arn and are
+# attached to the IRSA roles below. The IRSA trust/role objects (the community
+# iam-role-for-service-accounts-eks module) stay here because they bind to the
+# cluster OIDC provider — only the policy DEFINITIONS moved.
+
 # ---- 1. App IRSA (producer: API pods) ----------------------------------------
-
-data "aws_iam_policy_document" "app_s3" {
-  statement {
-    sid    = "ReadWriteTicketObjects"
-    effect = "Allow"
-    actions = [
-      "s3:PutObject",
-      "s3:GetObject",
-    ]
-    resources = ["${var.bucket_arn}/*"]
-  }
-
-  statement {
-    sid       = "ListTicketBucket"
-    effect    = "Allow"
-    actions   = ["s3:ListBucket"]
-    resources = [var.bucket_arn]
-  }
-
-  # sqs:SendMessage on the SPECIFIC queue ARN (no wildcard) — Delivery 4 B.
-  # The API producer (POST /v1/notifications/enqueue) calls SendMessage.
-  # Only added when var.sqs_queue_arn is non-empty (backward-compatible).
-  dynamic "statement" {
-    for_each = var.sqs_queue_arn != "" ? [1] : []
-    content {
-      sid       = "AllowProducerToSendMessages"
-      effect    = "Allow"
-      actions   = ["sqs:SendMessage"]
-      resources = [var.sqs_queue_arn]
-    }
-  }
-}
-
-resource "aws_iam_policy" "app_s3" {
-  name        = "${var.cluster_name}-app-s3"
-  description = "Least-privilege S3 + SQS access for the ticket-system API pods (PutObject/GetObject/ListBucket on attachments bucket; sqs:SendMessage on async queue)."
-  policy      = data.aws_iam_policy_document.app_s3.json
-  tags        = var.tags
-}
 
 module "app_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
@@ -62,7 +30,7 @@ module "app_irsa" {
   role_name = "${var.cluster_name}-app"
 
   role_policy_arns = {
-    s3 = aws_iam_policy.app_s3.arn
+    s3 = var.app_policy_arn
   }
 
   oidc_providers = {
@@ -76,40 +44,10 @@ module "app_irsa" {
 }
 
 # ---- 2. Consumer IRSA (async consumer worker pods) ---------------------------
-# Separate role with ONLY the permissions the consumer needs:
+# Separate role attached to the consumer policy (created in ./modules/iam):
 #   - sqs:ReceiveMessage, sqs:DeleteMessage, sqs:GetQueueAttributes (polling)
 #   - s3:PutObject on bucket/* (write processed-message object per message)
 # Only provisioned when var.sqs_queue_arn is set (D4 feature gate).
-
-data "aws_iam_policy_document" "consumer" {
-  count = var.sqs_queue_arn != "" ? 1 : 0
-
-  statement {
-    sid    = "AllowConsumerToReceiveAndDelete"
-    effect = "Allow"
-    actions = [
-      "sqs:ReceiveMessage",
-      "sqs:DeleteMessage",
-      "sqs:GetQueueAttributes",
-    ]
-    resources = [var.sqs_queue_arn]
-  }
-
-  statement {
-    sid       = "AllowConsumerToWriteObjects"
-    effect    = "Allow"
-    actions   = ["s3:PutObject"]
-    resources = ["${var.bucket_arn}/*"]
-  }
-}
-
-resource "aws_iam_policy" "consumer" {
-  count       = var.sqs_queue_arn != "" ? 1 : 0
-  name        = "${var.cluster_name}-consumer-sqs-s3"
-  description = "Least-privilege SQS + S3 access for the ticket-system async consumer pods (ReceiveMessage/DeleteMessage/GetQueueAttributes on async queue; PutObject on attachments bucket)."
-  policy      = data.aws_iam_policy_document.consumer[0].json
-  tags        = var.tags
-}
 
 module "consumer_irsa" {
   count   = var.sqs_queue_arn != "" ? 1 : 0
@@ -119,7 +57,7 @@ module "consumer_irsa" {
   role_name = "${var.cluster_name}-consumer"
 
   role_policy_arns = {
-    sqs_s3 = aws_iam_policy.consumer[0].arn
+    sqs_s3 = var.consumer_policy_arn
   }
 
   oidc_providers = {

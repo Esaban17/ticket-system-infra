@@ -110,6 +110,19 @@ variable "tags" {
   default     = {}
 }
 
+# ---- Centralized IAM policies (Delivery 5 — Deliverable A) -----------------
+
+variable "app_policy_arn" {
+  description = "ARN of the app (producer/API) IAM policy, created by the centralized ./modules/iam module. Attached to the app IRSA role (S3 PutObject/GetObject/ListBucket on the attachments bucket + sqs:SendMessage on the async queue)."
+  type        = string
+}
+
+variable "consumer_policy_arn" {
+  description = "ARN of the consumer IAM policy, created by the centralized ./modules/iam module. Attached to the consumer IRSA role (sqs:ReceiveMessage/DeleteMessage/GetQueueAttributes + s3:PutObject). Only consumed when sqs_queue_arn is set."
+  type        = string
+  default     = ""
+}
+
 # ---- Web frontend (SPA) ----------------------------------------------------
 
 variable "web_image" {

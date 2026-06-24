@@ -59,6 +59,13 @@ variable "log_retention_days" {
   default     = 14
 }
 
+# ---- Execution role (Delivery 5 — centralized IAM module) -------------------
+
+variable "execution_role_arn" {
+  description = "ARN of the Lambda execution role, created by the centralized ./modules/iam module (Delivery 5, Deliverable A). Assigned to aws_lambda_function.role. The role grants CloudWatch Logs on this function's log group + scoped S3 access + the AWS-managed VPC access policy."
+  type        = string
+}
+
 # ---- S3 integration (Delivery 4 — report generator) -------------------------
 
 variable "bucket_name" {
