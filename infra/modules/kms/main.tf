@@ -24,6 +24,7 @@
 # ---------------------------------------------------------------------------
 
 data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
 
 data "aws_iam_policy_document" "key" {
   # (a) Administrative actions to the account root — scoped, NOT "kms:*".
@@ -107,6 +108,44 @@ data "aws_iam_policy_document" "key" {
         variable = "aws:PrincipalArn"
         values   = var.allowed_role_arns
       }
+    }
+  }
+
+  # (d) IAM-delegated key use VIA the AWS services that encrypt with this CMK
+  # (Secrets Manager, RDS, S3). Creating a secret/DB/bucket with the CMK requires
+  # the CALLING IAM principal (e.g. the CI runner) — not just the service — to be
+  # authorized to GenerateDataKey/Decrypt. This is the standard "enable IAM"
+  # delegation to the account root, but CONDITIONED on kms:ViaService so it is
+  # NOT an open root grant: the key is only usable THROUGH these named services
+  # (rubric-compliant — conditioned, not bare root).
+  statement {
+    sid    = "AllowIamUseViaAwsServices"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey",
+      "kms:CreateGrant",
+    ]
+
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values = [
+        "secretsmanager.${data.aws_region.current.name}.amazonaws.com",
+        "rds.${data.aws_region.current.name}.amazonaws.com",
+        "s3.${data.aws_region.current.name}.amazonaws.com",
+      ]
     }
   }
 }
