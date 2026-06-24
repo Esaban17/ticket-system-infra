@@ -2,6 +2,7 @@ import { apiClient } from './client';
 import type {
   AssignTicketRequest,
   ChangeStateRequest,
+  CreateCommentRequest,
   CreateTicketRequest,
   ListEventsParams,
   ListResponse,
@@ -78,4 +79,16 @@ export function changeState(
   body: ChangeStateRequest,
 ): Promise<Ticket> {
   return apiClient.patch<Ticket>(`/tickets/${ticketId}/state`, { body });
+}
+
+/**
+ * Agrega un comentario al ticket (EP-13 / BL-120). El backend valida RBAC:
+ * el reportante solo puede comentar SUS tickets; agente/admin, cualquiera (403 si no).
+ * Genera un TicketEvent de tipo 'comentario' con el texto en payload.message.
+ */
+export function createComment(
+  ticketId: string,
+  body: CreateCommentRequest,
+): Promise<TicketEvent> {
+  return apiClient.post<TicketEvent>(`/tickets/${ticketId}/comments`, { body });
 }

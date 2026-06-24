@@ -70,6 +70,7 @@ const PAYLOAD_KEY_LABELS: Record<string, string> = {
   attachmentId: 'Adjunto',
   filename: 'Archivo',
   comment: 'Comentario',
+  message: 'Comentario',
   ticketNumber: 'Ticket',
   slaDueAt: 'SLA vence',
 };
