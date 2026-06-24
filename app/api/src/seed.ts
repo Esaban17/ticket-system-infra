@@ -8,9 +8,16 @@
 
 import { PrismaClient, Role, TicketType, Priority } from '@prisma/client';
 
-const prisma = new PrismaClient();
+import { loadSecretIntoEnv } from './config/secret-loader';
 
 async function main(): Promise<void> {
+  // D5-B: si SECRET_ARN está presente (Job de seed), compone DATABASE_URL desde
+  // Secrets Manager ANTES de instanciar PrismaClient. El Job ya lo hace vía
+  // secret-cli, pero esto deja el seed robusto si se invoca directamente.
+  await loadSecretIntoEnv();
+
+  const prisma = new PrismaClient();
+
   const reporter = await prisma.user.upsert({
     where: { email: 'reportante@ticket-system.dev' },
     update: {},
@@ -47,12 +54,12 @@ async function main(): Promise<void> {
     // eslint-disable-next-line no-console
     console.log(`Seed: usuarios asegurados; ${ticketCount} ticket(s) ya existen.`);
   }
+
+  await prisma.$disconnect();
 }
 
-main()
-  .then(() => prisma.$disconnect())
-  .catch((err) => {
-    // eslint-disable-next-line no-console
-    console.error('Seed failed:', err);
-    return prisma.$disconnect().finally(() => process.exit(1));
-  });
+main().catch((err) => {
+  // eslint-disable-next-line no-console
+  console.error('Seed failed:', err);
+  process.exit(1);
+});

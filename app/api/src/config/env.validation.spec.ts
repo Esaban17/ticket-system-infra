@@ -198,14 +198,27 @@ describe('validate()', () => {
     );
   });
 
-  it('el error contiene todos los campos inválidos cuando faltan varios', () => {
+  it('el error reporta DATABASE_URL cuando falta (sin SECRET_ARN)', () => {
+    // D5-B: DATABASE_URL es opcional a nivel de campo (la deriva el secret-loader
+    // desde SECRET_ARN). El error "falta DATABASE_URL (y no hay SECRET_ARN)"
+    // proviene de un superRefine, que en Zod solo corre si el parseo base tuvo
+    // éxito. Por eso aquí se provee un JWT_SECRET válido para que el refine se
+    // dispare y reporte DATABASE_URL.
     let errorMsg = '';
     try {
-      validate({} as Record<string, unknown>);
+      validate({ JWT_SECRET: BASE_ENV.JWT_SECRET } as Record<string, unknown>);
     } catch (e) {
       errorMsg = (e as Error).message;
     }
     expect(errorMsg).toContain('DATABASE_URL');
-    expect(errorMsg).toContain('JWT_SECRET');
+  });
+
+  it('acepta env sin DATABASE_URL cuando SECRET_ARN está presente (D5-B)', () => {
+    const result = validate({
+      JWT_SECRET: BASE_ENV.JWT_SECRET,
+      SECRET_ARN: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:ticket-system-dev-db-abc',
+    } as Record<string, unknown>);
+    expect(result.DATABASE_URL).toBeUndefined();
+    expect(result.SECRET_ARN).toContain('secret:ticket-system-dev-db');
   });
 });

@@ -110,6 +110,47 @@ resource "aws_iam_role_policy" "lambda_s3" {
   policy = data.aws_iam_policy_document.lambda_s3.json
 }
 
+# ---- Secrets Manager + KMS (Delivery 5 — Deliverable B) ---------------------
+# Scoped to the EXACT secret + key ARNs (no wildcards):
+#   - secretsmanager:GetSecretValue on the DB credentials secret
+#   - kms:Decrypt to unwrap that secret AND kms:GenerateDataKey because the
+#     attachments bucket is now SSE-KMS, so the Lambda's s3:PutObject must wrap
+#     an object data key. Reubicado desde el módulo compute (D5-B se construyó
+#     sobre la estructura pre-A); ahora vive aquí junto al resto de los grants.
+data "aws_iam_policy_document" "lambda_secrets" {
+  count = var.secret_arn != "" || var.kms_key_arn != "" ? 1 : 0
+
+  dynamic "statement" {
+    for_each = var.secret_arn != "" ? [1] : []
+    content {
+      sid       = "AllowReadDbCredentialsSecret"
+      effect    = "Allow"
+      actions   = ["secretsmanager:GetSecretValue"]
+      resources = [var.secret_arn]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = var.kms_key_arn != "" ? [1] : []
+    content {
+      sid    = "AllowDecryptAndGenerateDataKey"
+      effect = "Allow"
+      actions = [
+        "kms:Decrypt",
+        "kms:GenerateDataKey",
+      ]
+      resources = [var.kms_key_arn]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_secrets" {
+  count  = var.secret_arn != "" || var.kms_key_arn != "" ? 1 : 0
+  name   = "${var.function_name}-secrets-kms"
+  role   = aws_iam_role.lambda_exec.id
+  policy = data.aws_iam_policy_document.lambda_secrets[0].json
+}
+
 # AWS-managed policy required for VPC-attached Lambdas (manages ENIs). Attaching
 # the managed policy keeps our own documents free of Resource="*".
 resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
@@ -190,6 +231,30 @@ data "aws_iam_policy_document" "app_s3" {
       effect    = "Allow"
       actions   = ["sqs:SendMessage"]
       resources = [var.sqs_queue_arn]
+    }
+  }
+
+  # Delivery 5 — Deliverable B: the API pods read the DB credentials secret at
+  # runtime via IRSA. secretsmanager:GetSecretValue scoped to the EXACT secret
+  # ARN (no wildcard) and kms:Decrypt scoped to the EXACT CMK ARN to unwrap the
+  # ciphertext. Each statement is gated on its ARN being set (backward-compatible).
+  dynamic "statement" {
+    for_each = var.secret_arn != "" ? [1] : []
+    content {
+      sid       = "AllowReadDbCredentialsSecret"
+      effect    = "Allow"
+      actions   = ["secretsmanager:GetSecretValue"]
+      resources = [var.secret_arn]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = var.kms_key_arn != "" ? [1] : []
+    content {
+      sid       = "AllowDecryptWithCmk"
+      effect    = "Allow"
+      actions   = ["kms:Decrypt", "kms:DescribeKey"]
+      resources = [var.kms_key_arn]
     }
   }
 }

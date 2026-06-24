@@ -17,7 +17,10 @@
 #                   subnets via subnet tags / nodegroup config later.
 # ---------------------------------------------------------------------------
 
+data "aws_caller_identity" "current" {}
+
 locals {
+  name_prefix      = "${var.project_name}-${var.environment}"
   eks_cluster_name = "${var.project_name}-${var.environment}-eks"
 
   # Worker Lambda name shared by module.compute (name) and module.iam
@@ -26,6 +29,54 @@ locals {
   # keeps them in sync from a single edit (no repeated "worker" string literal).
   worker_name          = "worker"
   worker_function_name = "${var.project_name}-${var.environment}-${local.worker_name}"
+
+  # Delivery 5 — Deliverable B: runtime execution role ARNs composed BY NAME so
+  # the KMS key policy can grant them data-plane access WITHOUT referencing the
+  # IAM/IRSA resources (those reference module.kms.key_arn — referencing them
+  # back from kms would form a cycle). The names mirror exactly how the modules
+  # build them:
+  #   - Lambda exec role: "${function_name}-role" (module.iam aws_iam_role.lambda_exec,
+  #     function_name = local.worker_function_name = "${project}-${env}-worker").
+  #   - App IRSA role:    "${cluster_name}-app" (ingress/iam.tf module.app_irsa
+  #     role_name = "${var.cluster_name}-app", cluster_name = local.eks_cluster_name).
+  lambda_exec_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.worker_function_name}-role"
+  app_irsa_role_arn    = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.eks_cluster_name}-app"
+
+  kms_allowed_role_arns = [
+    local.lambda_exec_role_arn,
+    local.app_irsa_role_arn,
+  ]
+}
+
+# ---- KMS (Delivery 5 — Deliverable B) -------------------------------------
+# Single customer-managed CMK encrypting S3 (SSE-KMS), RDS storage and the DB
+# credentials secret. Declared FIRST so storage/database/secrets/iam can scope
+# their encryption + kms:Decrypt to module.kms.key_arn. The key policy grants
+# the runtime roles BY NAME (local.kms_allowed_role_arns) to avoid an
+# iam <-> kms cycle (iam references module.kms.key_arn; kms must NOT reference iam).
+
+module "kms" {
+  source = "./modules/kms"
+
+  name_prefix             = local.name_prefix
+  deletion_window_in_days = var.kms_deletion_window_in_days
+  allowed_role_arns       = local.kms_allowed_role_arns
+}
+
+# ---- Secrets (Delivery 5 — Deliverable B) ---------------------------------
+# Secrets Manager secret with the DB credentials {username,password}, encrypted
+# with the CMK. The PASSWORD is generated here and consumed by module.database,
+# so secrets does NOT depend on database (cycle-free). host/port/dbname are
+# non-sensitive and flow to the app via the ConfigMap, not this secret.
+
+module "secrets" {
+  source = "./modules/secrets"
+
+  name_prefix             = local.name_prefix
+  kms_key_arn             = module.kms.key_arn
+  username                = var.db_username
+  db_password             = var.db_password
+  recovery_window_in_days = var.environment == "prod" ? 7 : 0
 }
 
 # ---- Network --------------------------------------------------------------
@@ -67,6 +118,9 @@ module "storage" {
   bucket_name          = "${var.project_name}-${var.environment}-attachments-${var.tickets_bucket_suffix}"
   force_destroy        = var.environment != "prod"
   cors_allowed_origins = var.attachments_cors_allowed_origins
+
+  # D5-B: SSE-KMS with the project CMK (replaces SSE-S3/AES256).
+  kms_key_arn = module.kms.key_arn
 }
 
 # ---- Cognito (IdP / SSO Hosted UI — EP-14) --------------------------------
@@ -115,6 +169,13 @@ module "iam" {
   bucket_arn    = module.storage.bucket_arn
   sqs_queue_arn = module.async.queue_arn
 
+  # D5-B: scope the app IRSA + Lambda exec data-plane grants to the EXACT secret
+  # and CMK ARNs (secretsmanager:GetSecretValue + kms:Decrypt[/GenerateDataKey]).
+  # These reference module.kms/module.secrets, which is why kms grants its
+  # runtime roles BY NAME (no back-reference to iam) to stay cycle-free.
+  secret_arn  = module.secrets.secret_arn
+  kms_key_arn = module.kms.key_arn
+
   # target_lambda_arn left empty: iam composes it by name to avoid the
   # iam <-> compute dependency cycle.
 }
@@ -154,14 +215,18 @@ module "compute" {
 module "database" {
   source = "./modules/database"
 
-  environment         = var.environment
-  project_name        = var.project_name
-  subnet_ids          = module.network.private_subnet_ids
-  security_group_ids  = [module.security.db_sg_id]
-  instance_class      = var.db_instance_class
-  multi_az            = var.db_multi_az
-  db_username         = var.db_username
-  db_password         = var.db_password
+  environment        = var.environment
+  project_name       = var.project_name
+  subnet_ids         = module.network.private_subnet_ids
+  security_group_ids = [module.security.db_sg_id]
+  instance_class     = var.db_instance_class
+  multi_az           = var.db_multi_az
+  db_username        = var.db_username
+  # D5-B: the master password now comes from the secrets module (generated or
+  # caller-provided) so RDS and the secret stay in sync — NOT from var.db_password
+  # directly (that var is only an optional override into module.secrets).
+  db_password         = module.secrets.password
+  kms_key_arn         = module.kms.key_arn
   deletion_protection = var.environment == "prod"
 }
 
@@ -304,7 +369,13 @@ module "ingress" {
   db_endpoint = module.database.endpoint
   db_name     = module.database.db_name
   db_username = var.db_username
-  db_password = var.db_password
+
+  # D5-B: the app reads the DB password from Secrets Manager at runtime (no
+  # cleartext DATABASE_URL Secret). SECRET_ARN + DB_HOST/DB_PORT/DB_NAME flow to
+  # the ConfigMap (DB_HOST/DB_PORT derived inside the module from db_endpoint).
+  # kms_key_arn documents the key; the IRSA kms:Decrypt grant lives in module.iam.
+  secret_arn  = module.secrets.secret_arn
+  kms_key_arn = module.kms.key_arn
 
   # D4: wire the SQS queue into the app ConfigMap (SQS_QUEUE_URL) and IRSA.
   sqs_queue_arn = module.async.queue_arn
