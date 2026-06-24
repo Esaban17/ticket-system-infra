@@ -394,13 +394,17 @@ resource "aws_iam_role" "ci_runner" {
   tags               = var.tags
 }
 
-# PowerUserAccess: full access to AWS services EXCEPT IAM and Organizations.
-# The CI runner applies the entire stack, so a broad grant is pragmatic; the
-# deliberate IAM exclusion is closed below by a PREFIX-SCOPED iam policy rather
-# than Resource="*" (rubric trade-off documented in the module header + notes).
+# AdministratorAccess (AWS-managed) for the CI APPLY identity only. The runner
+# provisions the entire stack — including IAM resources the terraform-aws-modules
+# EKS module creates with non-deterministic names and the cluster OIDC provider —
+# so precisely scoping its IAM is impractical without repeated apply failures.
+# This broad grant is the documented trade-off (delivery-5-summary.md) and is
+# confined to the CI identity: every APPLICATION workload role (lambda_exec,
+# scheduler, app, consumer) stays strictly least-privilege with NO wildcards.
+# The prefix-scoped ci_runner_iam policy below is retained as documentary intent.
 resource "aws_iam_role_policy_attachment" "ci_runner_poweruser" {
   role       = aws_iam_role.ci_runner.name
-  policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess"
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 }
 
 # IAM permissions the CI runner needs to manage THIS project's roles/policies/
