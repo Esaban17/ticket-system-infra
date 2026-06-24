@@ -298,15 +298,16 @@ resource "aws_iam_policy" "consumer" {
 # 4. GitHub Actions OIDC provider + CI runner role (prepared for Deliverable C)
 # ===========================================================================
 
-resource "aws_iam_openid_connect_provider" "github" {
-  url            = "https://token.actions.githubusercontent.com"
-  client_id_list = ["sts.amazonaws.com"]
-  thumbprint_list = [
-    "d89e3bd43d5d909b47a18977aa9d5ce36cee184c",
-    "f879abce0008e4eb126e0097e46620f5aaae26ad",
-  ]
-
-  tags = var.tags
+# The GitHub Actions OIDC provider is ACCOUNT-GLOBAL (AWS allows exactly one per
+# URL) and already exists in this account, shared with another project
+# (rubik-frontend-gh-actions trusts it). We therefore REFERENCE it via a data
+# source instead of creating/owning it: owning it would (a) collide on apply
+# (EntityAlreadyExists) and (b) destroy a sibling project's CI federation on our
+# Deliverable-F teardown. The federation is still fully provisioned-as-code — the
+# trust is established by the ci_runner role's assume_role_policy below. See
+# docs/iac-coverage.md for the rationale.
+data "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
 }
 
 # Trust policy: federated to the GitHub OIDC provider, locked to the specific
@@ -319,7 +320,7 @@ data "aws_iam_policy_document" "ci_runner_assume_role" {
 
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github.arn]
+      identifiers = [data.aws_iam_openid_connect_provider.github.arn]
     }
 
     condition {
@@ -392,20 +393,15 @@ data "aws_iam_policy_document" "ci_runner_iam" {
     ]
   }
 
+  # The OIDC provider is referenced via data source (account-global, shared), so
+  # CI only needs to READ it (terraform data lookup), never create/delete it.
   statement {
-    sid    = "ManageGithubOidcProvider"
+    sid    = "ReadGithubOidcProvider"
     effect = "Allow"
     actions = [
       "iam:GetOpenIDConnectProvider",
-      "iam:CreateOpenIDConnectProvider",
-      "iam:DeleteOpenIDConnectProvider",
-      "iam:UpdateOpenIDConnectProviderThumbprint",
-      "iam:AddClientIDToOpenIDConnectProvider",
-      "iam:RemoveClientIDFromOpenIDConnectProvider",
-      "iam:TagOpenIDConnectProvider",
-      "iam:UntagOpenIDConnectProvider",
     ]
-    resources = [aws_iam_openid_connect_provider.github.arn]
+    resources = [data.aws_iam_openid_connect_provider.github.arn]
   }
 }
 

@@ -172,7 +172,10 @@ variable "db_password" {
   sensitive   = true
 
   validation {
-    condition     = var.db_password == null || length(var.db_password) >= 12
+    # Ternary (not ||) so length() is NEVER evaluated when db_password is null —
+    # Terraform evaluates both sides of || in a validation condition, and
+    # length(null) errors with "argument must not be null".
+    condition     = var.db_password == null ? true : length(var.db_password) >= 12
     error_message = "db_password must be null (auto-generate) or at least 12 characters long."
   }
 }
