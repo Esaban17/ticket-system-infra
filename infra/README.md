@@ -230,6 +230,56 @@ See ADR 0011 para la comparativa con el track Lambda.
 
 ---
 
+## Runbook — Delivery 5 (One-Click Deployment)
+
+Despliegue completo de la arquitectura de 7 componentes (compute, storage, database, networking, async, security/IAM, observability) desde un estado de cuenta limpio, con un solo `git push` a `main`. No se requiere ninguna acción manual de consola entre el push y la finalización del pipeline.
+
+### 1. Permisos de cuenta requeridos
+
+- Cuenta AWS `203036352580`, región `us-east-1`.
+- El **bootstrap del backend** (`infra/bootstrap/`, bucket S3 + tabla DynamoDB de lock) debe existir (run-once; ver sección *Bootstrap del backend remoto*). **No** se destruye en la prueba de clean-state.
+- Un usuario/rol con permisos para crear el OIDC provider y el rol `ci_runner` en el **primer** apply (bootstrap de identidad): se ejecuta una vez con credenciales admin (o las llaves long-lived aún activas) para crear `module.iam`. Después, todo el CI corre vía OIDC sin llaves.
+
+### 2. GitHub Environments, Variables y Secrets
+
+- **Variables de repositorio** (Settings → Secrets and variables → Actions → *Variables*):
+  - `CI_RUNNER_ROLE_ARN` = output `ci_runner_role_arn` (ARN del rol OIDC del módulo `iam`).
+  - `AWS_REGION` = `us-east-1`.
+  - `INFRA_AUTO_APPLY` = `true` (kill-switch; `false` salta el pipeline).
+- **Environments**: `dev` (auto) y `staging` (con reviewer requerido, gate de aprobación — ADR 0012).
+- **Sin secrets long-lived**: tras validar OIDC, eliminar `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` y `TF_VAR_DB_PASSWORD` (la contraseña de RDS se autogenera en `module.secrets` y se cifra con el CMK; ver `docs/delivery-5-summary.md`).
+- Confirmar la suscripción de email del SNS topic de observabilidad (clic en el correo de AWS).
+
+### 3. Clonar y disparar el pipeline
+
+```bash
+# (Opcional) prueba de clean-state: destruir SOLO el workspace main (NO bootstrap)
+gh workflow run terraform-destroy.yml -f environment=dev   # o terraform destroy con backend dev
+
+# Clonar y disparar con un solo push a main
+git clone https://github.com/Esaban17/ticket-system-infra.git
+cd ticket-system-infra
+git commit --allow-empty -m "chore: trigger one-click deploy"
+git push origin main
+```
+
+El workflow `terraform-apply.yml` corre `init → plan → apply` en dos fases (cold-start capable): Fase 1 crea la infra AWS (network → EKS, SQS, scheduler, y sus deps iam/kms/secrets), Fase 2 aplica el stack in-cluster (alb_controller, ingress, keda, container_insights) y observability. Sin acciones manuales entre el push y el verde.
+
+### 4. Verificar los 7 componentes
+
+```bash
+cd infra/
+terraform init -backend-config=envs/dev/backend-dev.hcl
+terraform output                 # ARNs de los 7 componentes
+terraform state list             # ≥1 recurso por categoría (ver iac-coverage.md)
+terraform plan -detailed-exitcode   # exit 0 = idempotente (segundo push sin cambios)
+bash evidence/capture-delivery-5.sh # genera los .txt de evidencia
+```
+
+Mapeo completo componente → recurso Terraform en [`docs/iac-coverage.md`](./docs/iac-coverage.md).
+
+---
+
 ## Evidence
 
 Artefactos requeridos por el rubric del Delivery 2 (ver `infra/evidence/README.md` para los comandos de captura):
@@ -429,3 +479,47 @@ KEDA operator IRSA: `sqs:GetQueueAttributes` sobre el queue ARN exacto.
 - `kubectl get scaledobject -A` + `kubectl describe`: [`keda-scaled-object.png`](./evidence/keda-scaled-object.png)
 - `kubectl get hpa -A` (HPA gestionado por KEDA): [`keda-hpa.png`](./evidence/keda-hpa.png)
 - Evidencia CLI combinada: [`keda-evidence.txt`](./evidence/keda-evidence.txt)
+
+---
+
+## Evidence — Delivery 5 (Security, Observability & One-Click)
+
+Los `.txt` se generan con `bash evidence/capture-delivery-5.sh` (requiere `terraform init` con backend dev + credenciales); los `.png` los captura el operador en consola AWS / GitHub UI. Mapeo IaC en [`docs/iac-coverage.md`](./docs/iac-coverage.md); resumen en [`docs/delivery-5-summary.md`](./docs/delivery-5-summary.md).
+
+### Deliverable A — IAM Security Module
+- Recursos IAM del plan (roles/policies/OIDC, sin wildcards): [`iam-plan.txt`](./evidence/iam-plan.txt)
+
+### Deliverable B — Secrets Manager & KMS
+- `terraform output` (ARN del CMK + ARN del secret): [`secrets-kms.txt`](./evidence/secrets-kms.txt)
+- Consola del secret en AWS Secrets Manager: [`secrets-console.png`](./evidence/secrets-console.png)
+
+### Deliverable C — OIDC CI Authentication
+- GitHub Settings → Secrets sin llaves long-lived: [`oidc-secrets-removed.png`](./evidence/oidc-secrets-removed.png)
+- Log del workflow con intercambio de token OIDC OK: [`oidc-auth-log.png`](./evidence/oidc-auth-log.png)
+
+### Deliverable D — TLS Termination
+- `curl -v https` (200 + cert) y `curl -sI http` (301) + `kubectl describe ingress`: [`tls-curl.txt`](./evidence/tls-curl.txt)
+
+### Deliverable E — Observability Module
+- `terraform output` (log group + alarm ARNs): [`observability-outputs.txt`](./evidence/observability-outputs.txt)
+- Dashboard CloudWatch: [`dashboard.png`](./evidence/dashboard.png)
+- Cost budget (AWS Budgets, umbral 80%): [`budget.png`](./evidence/budget.png)
+
+### Deliverable F — One-Click Deployment Proof
+- Run de GitHub Actions desde clean-state (jobs en verde): [`clean-state-pipeline.png`](./evidence/clean-state-pipeline.png)
+- `terraform output` completo (7 componentes): [`terraform-output-full.txt`](./evidence/terraform-output-full.txt)
+- `terraform plan -detailed-exitcode` == 0 (idempotencia): [`idempotent-plan.txt`](./evidence/idempotent-plan.txt)
+
+### Deliverable I — Full IaC Coverage (obligatorio)
+- `terraform state list` (≥1 recurso por las 7 categorías): [`state-list.txt`](./evidence/state-list.txt)
+- Componentes running en consola AWS: [`deployed-components.png`](./evidence/deployed-components.png)
+- Tabla de cobertura: [`docs/iac-coverage.md`](./docs/iac-coverage.md)
+
+### Deliverable G (opcional) — IRSA & Monitoring
+- ServiceAccount con `eks.amazonaws.com/role-arn`: [`irsa-sa.png`](./evidence/irsa-sa.png)
+- Métricas de Container Insights activas: [`eks-monitoring.png`](./evidence/eks-monitoring.png)
+
+### Deliverable J (opcional) — Slack Deployment Bot
+Repo separado: [`Esaban17/ticket-deploy-bot`](https://github.com/Esaban17/ticket-deploy-bot) *(crear/compartir con graders)*.
+- Slash command `/deploy <env>` + respuesta del bot: [`bot-command.png`](./evidence/bot-command.png)
+- Run de GitHub Actions disparado por el bot: [`bot-pipeline-run.png`](./evidence/bot-pipeline-run.png)
