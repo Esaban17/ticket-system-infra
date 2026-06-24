@@ -40,9 +40,9 @@ variable "target_lambda_arn" {
 }
 
 variable "github_org" {
-  description = "GitHub organization/owner that owns the repository allowed to assume the CI runner role via OIDC. Used in the trust policy sub condition (repo:<org>/<repo>:ref:<branch_ref>)."
+  description = "GitHub organization/owner that owns the repository allowed to assume the CI runner role via OIDC. Used in the trust policy sub condition (repo:<org>/<repo>:ref:<branch_ref>). MUST be the repo's CURRENT owner as it appears in the GitHub Actions OIDC token sub claim — the 'gitcombo' remote URL is a redirect to the renamed owner 'Esaban17', and OIDC emits the current name."
   type        = string
-  default     = "gitcombo"
+  default     = "Esaban17"
 }
 
 variable "github_repo" {
