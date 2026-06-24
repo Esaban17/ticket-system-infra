@@ -308,3 +308,41 @@ variable "scheduler_timezone" {
   type        = string
   default     = "UTC"
 }
+
+# ---- Observability — Delivery 5, Deliverable E -----------------------------
+
+variable "alert_email" {
+  description = "Email address subscribed to the SNS alerts topic (CloudWatch alarms + AWS Budgets notifications). Empty (default) creates the topic without an email subscription. AWS sends a one-time confirmation email that must be accepted."
+  type        = string
+  default     = ""
+}
+
+variable "monthly_budget_usd" {
+  description = "Monthly cost budget (USD) for the project. AWS Budgets notifies at 80% of ACTUAL spend via the SNS alerts topic (and alert_email when set)."
+  type        = number
+  default     = 50
+}
+
+variable "lambda_error_threshold" {
+  description = "Threshold (count of worker Lambda invocation errors over the evaluation window) above which the lambda-errors alarm fires."
+  type        = number
+  default     = 1
+}
+
+variable "dlq_depth_threshold" {
+  description = "Threshold (number of visible messages in the SQS DLQ) above which the sqs-dlq-depth alarm fires."
+  type        = number
+  default     = 1
+}
+
+variable "alarm_period_seconds" {
+  description = "Length (seconds) of each metric aggregation period for the CloudWatch alarms and dashboard widgets."
+  type        = number
+  default     = 300
+}
+
+variable "alarm_evaluation_periods" {
+  description = "Number of consecutive periods a metric must breach the threshold before the alarm transitions to ALARM."
+  type        = number
+  default     = 1
+}

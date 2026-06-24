@@ -432,3 +432,39 @@ module "keda" {
   # keda module applies AFTER the cluster and ingress (consumer Deployment) exist.
   depends_on = [module.ingress]
 }
+
+# ---- Observability (Delivery 5 — Deliverable E) ---------------------------
+# CloudWatch log groups + alarms (Lambda Errors, SQS DLQ depth) + a dashboard,
+# all wired to an SNS alerts topic, plus a monthly AWS Budgets cost budget.
+# Log groups are encrypted with the project CMK. The alarms reference the
+# worker Lambda BY NAME (local.worker_function_name) and the DLQ name derived
+# from module.async.dlq_arn (SQS ARN's last colon segment is the queue name),
+# so this module does not add new cross-module dependency cycles.
+
+module "observability" {
+  source = "./modules/observability"
+
+  name_prefix = local.name_prefix
+  environment = var.environment
+  region      = var.region
+  kms_key_arn = module.kms.key_arn
+
+  # Alerting + budget.
+  alert_email        = var.alert_email
+  monthly_budget_usd = var.monthly_budget_usd
+
+  # Alarm targets.
+  lambda_function_name = local.worker_function_name
+  dlq_queue_name       = element(split(":", module.async.dlq_arn), length(split(":", module.async.dlq_arn)) - 1)
+
+  # Alarm tuning (all from root variables — no hardcoded thresholds/periods).
+  lambda_error_threshold   = var.lambda_error_threshold
+  dlq_depth_threshold      = var.dlq_depth_threshold
+  alarm_period_seconds     = var.alarm_period_seconds
+  alarm_evaluation_periods = var.alarm_evaluation_periods
+
+  # Dashboard dimensions. RDS identifier mirrors module.database
+  # (${project}-${env}-pg); the ALB suffix is left to the module default until
+  # the ingress module exposes the LoadBalancer ARN suffix.
+  rds_instance_identifier = "${local.name_prefix}-pg"
+}

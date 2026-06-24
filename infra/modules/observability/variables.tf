@@ -4,12 +4,12 @@ variable "name_prefix" {
 }
 
 variable "environment" {
-  description = "Deployment environment (dev, prod). Propagated as a tag and used to drive sensible per-env retention defaults from the caller."
+  description = "Deployment environment (dev, staging, prod). Propagated as a tag and used to drive sensible per-env retention defaults from the caller."
   type        = string
 
   validation {
-    condition     = contains(["dev", "prod"], var.environment)
-    error_message = "environment must be either 'dev' or 'prod'."
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "environment must be 'dev', 'staging', or 'prod'."
   }
 }
 
@@ -49,4 +49,76 @@ variable "tags" {
   description = "Extra tags merged into every resource created by this module."
   type        = map(string)
   default     = {}
+}
+
+# ---- Alerting (SNS) --------------------------------------------------------
+
+variable "alert_email" {
+  description = "Email address subscribed to the SNS alerts topic that receives CloudWatch alarm notifications and (optionally) budget notifications. When empty (the default) no email subscription is created and the topic only carries the budget/SNS wiring. AWS sends a one-time confirmation email that must be accepted before notifications flow."
+  type        = string
+  default     = ""
+}
+
+# ---- CloudWatch alarms -----------------------------------------------------
+
+variable "lambda_function_name" {
+  description = "Name of the worker Lambda whose Errors metric drives the 'lambda-errors' alarm. Used as the FunctionName dimension in the AWS/Lambda namespace. Comes from the caller (local.worker_function_name) so the alarm tracks the exact function deployed."
+  type        = string
+}
+
+variable "dlq_queue_name" {
+  description = "Name of the SQS dead-letter queue whose ApproximateNumberOfMessagesVisible metric drives the 'sqs-dlq-depth' alarm. Used as the QueueName dimension in the AWS/SQS namespace. Any visible message in the DLQ means a worker failed all retries."
+  type        = string
+}
+
+variable "lambda_error_threshold" {
+  description = "Threshold (count of Lambda invocation errors over the evaluation window) above which the 'lambda-errors' alarm fires. 1 means alarm on any error in the period."
+  type        = number
+  default     = 1
+}
+
+variable "dlq_depth_threshold" {
+  description = "Threshold (number of visible messages in the DLQ) above which the 'sqs-dlq-depth' alarm fires. 1 means alarm as soon as a single message is dead-lettered."
+  type        = number
+  default     = 1
+}
+
+variable "alarm_period_seconds" {
+  description = "Length (in seconds) of each metric aggregation period for the CloudWatch alarms. 300 (5 minutes) is the default CloudWatch granularity for these metrics."
+  type        = number
+  default     = 300
+}
+
+variable "alarm_evaluation_periods" {
+  description = "Number of consecutive periods the metric must breach the threshold before the alarm transitions to ALARM. 1 reacts as fast as possible."
+  type        = number
+  default     = 1
+}
+
+# ---- Dashboard inputs ------------------------------------------------------
+
+variable "region" {
+  description = "AWS region used by the CloudWatch dashboard widgets to scope the metrics. Defaults to the provider region when unset by the caller."
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "alb_arn_suffix" {
+  description = "ARN suffix (LoadBalancer dimension value, e.g. 'app/<name>/<id>') of the ingress ALB used by the dashboard request-count widget (AWS/ApplicationELB RequestCount). When empty the widget renders without a series rather than referencing a hardcoded ALB."
+  type        = string
+  default     = ""
+}
+
+variable "rds_instance_identifier" {
+  description = "RDS DBInstanceIdentifier used by the dashboard DatabaseConnections widget (AWS/RDS). When empty the widget renders without a series rather than referencing a hardcoded instance."
+  type        = string
+  default     = ""
+}
+
+# ---- Budget ----------------------------------------------------------------
+
+variable "monthly_budget_usd" {
+  description = "Monthly cost budget (USD) for the project. AWS Budgets sends a notification when ACTUAL spend exceeds 80% of this amount, routed to the SNS alerts topic (and the alert_email if set)."
+  type        = number
+  default     = 50
 }
