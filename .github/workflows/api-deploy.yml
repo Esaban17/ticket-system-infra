@@ -11,9 +11,10 @@ name: API Deploy
 #      El target acotado evita resetear kubernetes_deployment.web a la imagen
 #      por defecto (bootstrap, inexistente en ECR) que causaría ImagePullBackOff.
 #
-# Auth a AWS con el mismo patrón de secrets que terraform-apply.yml
-# (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION). El password de la
-# DB llega por TF_VAR_db_password y nunca se commitea (rúbrica).
+# Auth a AWS con el mismo patrón OIDC que terraform-apply.yml: el job asume el
+# rol vars.CI_RUNNER_ROLE_ARN vía OIDC (id-token: write); no hay secrets de IAM
+# long-lived. El password de la DB lo genera la propia BD (Deliverable B), ya no
+# se inyecta por TF_VAR_db_password.
 #
 # Rollback: re-disparar este workflow apuntando a un SHA previo, o aplicar a
 # mano `terraform apply -target=module.ingress -var api_image_tag=<sha-anterior>`
@@ -38,11 +39,8 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
+      id-token: write
       contents: read
-
-    env:
-      # Valor sensible inyectado como TF_VAR_* — nunca se commitea (rúbrica).
-      TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -57,9 +55,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ vars.CI_RUNNER_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: ecr-login
