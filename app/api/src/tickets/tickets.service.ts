@@ -413,4 +413,42 @@ export class TicketsService {
     }
     return updated;
   }
+
+  /**
+   * Agrega un comentario a un ticket (EP-13 / BL-120). Valida existencia y, para
+   * un reportante, que el ticket sea suyo (403 si es ajeno). Crea un TicketEvent
+   * `comentario` (append-only, mismo patrón que los demás eventos) con el actor y
+   * el texto en el payload, y luego encola best-effort un correo `ticket.commented`
+   * al reportante (un fallo de notificación NO rompe la creación del comentario).
+   * Devuelve el evento creado.
+   */
+  async addComment(ticketId: string, actor: User, message: string) {
+    const ticket = await this.prisma.ticket.findUnique({ where: { id: ticketId } });
+    if (!ticket) {
+      throw new NotFoundException('Ticket no encontrado');
+    }
+    // RBAC: el reportante solo puede comentar SUS propios tickets; agente/admin, cualquiera.
+    if (actor.role === Role.reportante && ticket.reporterId !== actor.id) {
+      throw new ForbiddenException('No puedes comentar un ticket que no es tuyo');
+    }
+
+    const event = await this.prisma.ticketEvent.create({
+      data: {
+        ticketId,
+        actorId: actor.id,
+        eventType: EventType.comentario,
+        payload: { actor_id: actor.id, message },
+      },
+    });
+
+    // EP-12 / BL-119: avisa al reportante que su ticket recibió un comentario.
+    await this.notifyReporter(
+      ticket,
+      'ticket.commented',
+      `[${ticket.ticketNumber}] Nuevo comentario en tu ticket`,
+      `Hola,\n\nTu ticket ${ticket.ticketNumber} — "${ticket.title}" recibió un nuevo comentario:\n\n` +
+        `${message}\n\nIngresa al sistema para responder.\n\n— Sistema de Tickets`,
+    );
+    return event;
+  }
 }

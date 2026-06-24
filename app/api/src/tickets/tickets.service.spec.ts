@@ -368,3 +368,66 @@ describe('TicketsService.changeState', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 });
+
+describe('TicketsService.addComment', () => {
+  const ticketRow = {
+    id: 't1',
+    ticketNumber: 'TKT-0001',
+    title: 'Falla',
+    reporterId: 'u1',
+  };
+
+  it('crea el TicketEvent comentario y encola ticket.commented', async () => {
+    const { svc, prisma, notifications } = setup();
+    (prisma.ticket.findUnique as jest.Mock).mockResolvedValue(ticketRow);
+    (prisma.ticketEvent.create as jest.Mock).mockResolvedValue({ id: 'ev1' });
+
+    const ev = await svc.addComment('t1', agent, 'Estamos revisando');
+    expect(ev).toEqual({ id: 'ev1' });
+
+    const data = (prisma.ticketEvent.create as jest.Mock).mock.calls[0][0].data;
+    expect(data.ticketId).toBe('t1');
+    expect(data.actorId).toBe('ag');
+    expect(data.eventType).toBe('comentario');
+    expect(data.payload).toMatchObject({ actor_id: 'ag', message: 'Estamos revisando' });
+
+    expect(notifications.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'ticket.commented',
+        ticketId: 't1',
+        recipientEmail: 'reporter@b.c',
+      }),
+    );
+  });
+
+  it('404 si el ticket no existe', async () => {
+    const { svc, prisma } = setup();
+    (prisma.ticket.findUnique as jest.Mock).mockResolvedValue(null);
+    await expect(svc.addComment('x', agent, 'hola')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('el reportante propio puede comentar su ticket', async () => {
+    const { svc, prisma } = setup();
+    (prisma.ticket.findUnique as jest.Mock).mockResolvedValue(ticketRow);
+    (prisma.ticketEvent.create as jest.Mock).mockResolvedValue({ id: 'ev1' });
+    const ev = await svc.addComment('t1', reporter, 'Sigue fallando');
+    expect(ev).toEqual({ id: 'ev1' });
+  });
+
+  it('un reportante NO puede comentar el ticket de otro → 403', async () => {
+    const { svc, prisma } = setup();
+    (prisma.ticket.findUnique as jest.Mock).mockResolvedValue({ ...ticketRow, reporterId: 'otro' });
+    await expect(svc.addComment('t1', reporter, 'hola')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.ticketEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('un fallo del productor SQS NO rompe la creación del comentario (best-effort)', async () => {
+    const { svc, prisma, notifications } = setup();
+    (prisma.ticket.findUnique as jest.Mock).mockResolvedValue(ticketRow);
+    (prisma.ticketEvent.create as jest.Mock).mockResolvedValue({ id: 'ev1' });
+    (notifications.enqueue as jest.Mock).mockRejectedValue(new Error('SQS down'));
+
+    const ev = await svc.addComment('t1', agent, 'Estamos revisando');
+    expect(ev).toEqual({ id: 'ev1' });
+  });
+});
