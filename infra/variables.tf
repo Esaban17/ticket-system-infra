@@ -295,6 +295,20 @@ variable "keda_queue_length_trigger" {
   default     = 5
 }
 
+# ---- Container Insights (monitoring en EKS) — Delivery 5, Deliverable G ----
+
+variable "cloudwatch_metrics_chart_version" {
+  description = "Version of the aws-cloudwatch-metrics Helm chart (CloudWatch agent for Container Insights metrics) from https://aws.github.io/eks-charts."
+  type        = string
+  default     = "0.0.11"
+}
+
+variable "fluent_bit_chart_version" {
+  description = "Version of the aws-for-fluent-bit Helm chart (container log shipping to CloudWatch Logs) from https://aws.github.io/eks-charts."
+  type        = string
+  default     = "0.1.34"
+}
+
 # ---- EventBridge Scheduler — Delivery 4, Deliverable C ---------------------
 
 variable "scheduler_expression" {

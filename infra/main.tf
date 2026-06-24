@@ -307,6 +307,26 @@ module "alb_controller" {
   depends_on = [module.eks, module.network]
 }
 
+# ---- Container Insights (Delivery 5 — Deliverable G, opcional) ------------
+# Monitoring stack en EKS vía CloudWatch Container Insights: el CloudWatch agent
+# (DaemonSet) publica métricas de pods/nodos y Fluent Bit envía los logs de los
+# contenedores a CloudWatch Logs. Un único IRSA (CloudWatchAgentServerPolicy)
+# autentica ambos DaemonSets. depends_on sobre eks + alb_controller fuerza que el
+# cluster y el control-plane de Helm/IRSA existan antes de instalar los charts.
+
+module "container_insights" {
+  source = "./modules/container-insights"
+
+  cluster_name      = module.eks.cluster_name
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  region            = var.region
+
+  cloudwatch_metrics_chart_version = var.cloudwatch_metrics_chart_version
+  fluent_bit_chart_version         = var.fluent_bit_chart_version
+
+  depends_on = [module.eks, module.alb_controller]
+}
+
 # ---- Async Messaging Module (Delivery 4 — Deliverable A) ------------------
 # SQS main queue + DLQ. Standard queue (not FIFO) with a redrive policy that
 # moves messages to the DLQ after max_receive_count failed delivery attempts.
