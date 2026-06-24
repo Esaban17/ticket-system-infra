@@ -166,14 +166,26 @@ variable "db_username" {
 }
 
 variable "db_password" {
-  description = "Master password for the RDS instance. MUST be provided via the TF_VAR_db_password environment variable — never via .tfvars or .tf files committed to git."
+  description = "OPTIONAL master password override for the RDS instance. Delivery 5 — Deliverable B: when null (the default) the secrets module GENERATES a strong random password and stores it in Secrets Manager; RDS consumes that same value. Provide a non-null value (>=12 chars) only to adopt an existing/external password — and prefer the TF_VAR_db_password environment variable over any committed file. TF_VAR_db_password is no longer REQUIRED in CI (the change to the workflows is left to Deliverable C)."
   type        = string
+  default     = null
   sensitive   = true
 
   validation {
-    condition     = length(var.db_password) >= 12
-    error_message = "db_password must be at least 12 characters long."
+    # Ternary (not ||) so length() is NEVER evaluated when db_password is null —
+    # Terraform evaluates both sides of || in a validation condition, and
+    # length(null) errors with "argument must not be null".
+    condition     = var.db_password == null ? true : length(var.db_password) >= 12
+    error_message = "db_password must be null (auto-generate) or at least 12 characters long."
   }
+}
+
+# ---- KMS (Delivery 5 — Deliverable B) -------------------------------------
+
+variable "kms_deletion_window_in_days" {
+  description = "Days AWS waits before permanently deleting the project CMK after ScheduleKeyDeletion. 7 (minimum) keeps dev teardown fast; raise toward 30 in prod for an undo window."
+  type        = number
+  default     = 7
 }
 
 # ---- ECR (container registries) ------------------------------------------
@@ -286,6 +298,20 @@ variable "keda_queue_length_trigger" {
   default     = 5
 }
 
+# ---- Container Insights (monitoring en EKS) — Delivery 5, Deliverable G ----
+
+variable "cloudwatch_metrics_chart_version" {
+  description = "Version of the aws-cloudwatch-metrics Helm chart (CloudWatch agent for Container Insights metrics) from https://aws.github.io/eks-charts."
+  type        = string
+  default     = "0.0.11"
+}
+
+variable "fluent_bit_chart_version" {
+  description = "Version of the aws-for-fluent-bit Helm chart (container log shipping to CloudWatch Logs) from https://aws.github.io/eks-charts."
+  type        = string
+  default     = "0.1.34"
+}
+
 # ---- EventBridge Scheduler — Delivery 4, Deliverable C ---------------------
 
 variable "scheduler_expression" {
@@ -298,4 +324,48 @@ variable "scheduler_timezone" {
   description = "IANA timezone for the EventBridge Scheduler schedule expression."
   type        = string
   default     = "UTC"
+}
+
+# ---- Observability — Delivery 5, Deliverable E -----------------------------
+
+variable "alert_email" {
+  description = "Email address subscribed to the SNS alerts topic (CloudWatch alarms + AWS Budgets notifications). Empty (default) creates the topic without an email subscription. AWS sends a one-time confirmation email that must be accepted."
+  type        = string
+  default     = ""
+}
+
+variable "monthly_budget_usd" {
+  description = "Monthly cost budget (USD) for the project. AWS Budgets notifies at 80% of ACTUAL spend via the SNS alerts topic (and alert_email when set)."
+  type        = number
+  default     = 50
+}
+
+variable "notification_email" {
+  description = "Dirección de email verificada en SES (EP-12 / BL-119) usada como remitente de los correos de notificación de tickets (resuelto/comentado/asignado) y, en sandbox, también como buzón de prueba. Se pasa a module.ses (identidad de email, sin DNS) y fluye a module.iam (scope del SendEmail) y al ConfigMap del app/consumer (SES_FROM_ADDRESS)."
+  type        = string
+  default     = "estuardo1314@gmail.com"
+}
+
+variable "lambda_error_threshold" {
+  description = "Threshold (count of worker Lambda invocation errors over the evaluation window) above which the lambda-errors alarm fires."
+  type        = number
+  default     = 1
+}
+
+variable "dlq_depth_threshold" {
+  description = "Threshold (number of visible messages in the SQS DLQ) above which the sqs-dlq-depth alarm fires."
+  type        = number
+  default     = 1
+}
+
+variable "alarm_period_seconds" {
+  description = "Length (seconds) of each metric aggregation period for the CloudWatch alarms and dashboard widgets."
+  type        = number
+  default     = 300
+}
+
+variable "alarm_evaluation_periods" {
+  description = "Number of consecutive periods a metric must breach the threshold before the alarm transitions to ALARM."
+  type        = number
+  default     = 1
 }

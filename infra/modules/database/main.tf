@@ -58,6 +58,7 @@ resource "aws_db_instance" "this" {
   allocated_storage      = var.allocated_storage_gb
   storage_type           = "gp3"
   storage_encrypted      = true
+  kms_key_id             = var.kms_key_arn
   db_name                = var.db_name
   username               = var.db_username
   password               = var.db_password

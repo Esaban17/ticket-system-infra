@@ -24,15 +24,20 @@ resource "aws_s3_bucket_versioning" "this" {
   }
 }
 
-# ---- Server-side encryption (SSE-S3 / AES256) -----------------------------
+# ---- Server-side encryption (SSE-KMS with the project CMK) ----------------
+# Delivery 5 — Deliverable B: upgraded from SSE-S3 (AES256) to SSE-KMS using
+# the customer-managed key (module.kms). bucket_key_enabled = true lets S3 use
+# a bucket-level data key, cutting KMS API calls (and cost) on every object op.
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
   bucket = aws_s3_bucket.this.id
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = var.kms_key_arn
     }
+    bucket_key_enabled = true
   }
 }
 

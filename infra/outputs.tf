@@ -199,6 +199,18 @@ output "consumer_role_arn" {
   value       = module.ingress.consumer_role_arn
 }
 
+# ---- IAM (Delivery 5 — Deliverable A / prereq for C) -----------------------
+
+output "ci_runner_role_arn" {
+  description = "ARN of the GitHub Actions OIDC CI runner role (PowerUserAccess + prefix-scoped iam:*). Consumed by Deliverable C as the role-to-assume in the GitHub Actions workflow (aws-actions/configure-aws-credentials)."
+  value       = module.iam.ci_runner_role_arn
+}
+
+output "github_oidc_provider_arn" {
+  description = "ARN of the GitHub Actions OIDC identity provider. Consumed by Deliverable C and useful when adding further OIDC-federated roles."
+  value       = module.iam.github_oidc_provider_arn
+}
+
 # ---- TLS / dominio (subdominio HTTPS) -------------------------------------
 
 output "acm_certificate_arn" {
@@ -209,4 +221,21 @@ output "acm_certificate_arn" {
 output "tls_domain_validation" {
   description = "Registros CNAME a crear en Hostinger para validar el cert ACM (name → value)."
   value       = module.tls.domain_validation_options
+}
+
+# ---- Observability (Delivery 5 — Deliverable E) ---------------------------
+
+output "observability_alarm_arns" {
+  description = "Map of logical alarm name to CloudWatch metric alarm ARN (lambda-errors, sqs-dlq-depth). Both alarms notify the SNS alerts topic."
+  value       = module.observability.alarm_arns
+}
+
+output "observability_dashboard_name" {
+  description = "Name of the CloudWatch dashboard with the ALB request count, Lambda error rate and DLQ/RDS widgets."
+  value       = module.observability.dashboard_name
+}
+
+output "observability_sns_topic_arn" {
+  description = "ARN of the SNS alerts topic that fans out CloudWatch alarm and AWS Budgets notifications."
+  value       = module.observability.sns_topic_arn
 }

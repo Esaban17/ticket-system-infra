@@ -9,8 +9,8 @@ output "function_name" {
 }
 
 output "role_arn" {
-  description = "ARN of the IAM execution role attached to the Lambda. Useful when granting the function access to additional resources (e.g., S3 bucket, SQS queue)."
-  value       = aws_iam_role.lambda_exec.arn
+  description = "ARN of the IAM execution role attached to the Lambda (created in ./modules/iam and injected via var.execution_role_arn). Useful when granting the function access to additional resources."
+  value       = var.execution_role_arn
 }
 
 output "security_group_id" {

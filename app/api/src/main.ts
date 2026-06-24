@@ -3,9 +3,15 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { AppModule } from './app.module';
+import { loadSecretIntoEnv } from './config/secret-loader';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
+
+  // D5-B: cargar credenciales de BD desde Secrets Manager y componer
+  // DATABASE_URL ANTES de crear el módulo (env.validation lo exige). En local
+  // (sin SECRET_ARN) es no-op y se usa el DATABASE_URL del entorno/.env.
+  await loadSecretIntoEnv();
 
   const app = await NestFactory.create(AppModule, {
     // Los niveles de log se ajustan desde env LOG_LEVEL en el módulo de config

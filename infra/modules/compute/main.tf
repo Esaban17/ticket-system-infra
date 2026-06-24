@@ -20,11 +20,7 @@ terraform {
 
 locals {
   function_name = "${var.project_name}-${var.environment}-${var.name}"
-  log_group_arn = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.function_name}:*"
 }
-
-data "aws_region" "current" {}
-data "aws_caller_identity" "current" {}
 
 # ---- Source code archive --------------------------------------------------
 
@@ -35,87 +31,11 @@ data "archive_file" "lambda" {
 }
 
 # ---- Execution role -------------------------------------------------------
-# Trust policy: only the Lambda service can assume this role.
-
-data "aws_iam_policy_document" "assume_role" {
-  statement {
-    sid     = "AllowLambdaServiceToAssumeRole"
-    effect  = "Allow"
-    actions = ["sts:AssumeRole"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["lambda.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "lambda_exec" {
-  name               = "${local.function_name}-role"
-  assume_role_policy = data.aws_iam_policy_document.assume_role.json
-}
-
-# Inline policy: CloudWatch Logs on the SPECIFIC log group of this function.
-# No wildcards in Action or Resource (rubric: "Wildcard Action or Resource
-# values are not permitted").
-
-data "aws_iam_policy_document" "lambda_logs" {
-  statement {
-    sid    = "AllowLambdaToWriteLogs"
-    effect = "Allow"
-
-    actions = [
-      "logs:CreateLogStream",
-      "logs:PutLogEvents",
-    ]
-
-    resources = [local.log_group_arn]
-  }
-}
-
-resource "aws_iam_role_policy" "lambda_logs" {
-  name   = "${local.function_name}-logs"
-  role   = aws_iam_role.lambda_exec.id
-  policy = data.aws_iam_policy_document.lambda_logs.json
-}
-
-# ---- S3 permissions (Delivery 4 — report generator) -------------------------
-# Only created when enable_s3_access = true. Using a plain bool (not derived
-# from bucket_arn) prevents Terraform "count depends on apply-time value"
-# errors on cold-start applies where module.storage hasn't been created yet.
-
-data "aws_iam_policy_document" "lambda_s3" {
-  count = var.enable_s3_access ? 1 : 0
-
-  statement {
-    sid       = "AllowLambdaToListBucket"
-    effect    = "Allow"
-    actions   = ["s3:ListBucket"]
-    resources = [var.bucket_arn]
-  }
-
-  statement {
-    sid       = "AllowLambdaToWriteReports"
-    effect    = "Allow"
-    actions   = ["s3:PutObject"]
-    resources = ["${var.bucket_arn}/*"]
-  }
-}
-
-resource "aws_iam_role_policy" "lambda_s3" {
-  count  = var.enable_s3_access ? 1 : 0
-  name   = "${local.function_name}-s3"
-  role   = aws_iam_role.lambda_exec.id
-  policy = data.aws_iam_policy_document.lambda_s3[0].json
-}
-
-# AWS-managed policy required for Lambdas attached to a VPC (manages ENIs).
-# Attaching the AWS-managed policy keeps our own policy documents clean —
-# we don't write Resource: "*" ourselves.
-resource "aws_iam_role_policy_attachment" "vpc_access" {
-  role       = aws_iam_role.lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-}
+# The execution role, its CloudWatch Logs / S3 inline policies and the
+# AWS-managed VPC-access attachment were CENTRALIZED into ./modules/iam
+# (Delivery 5, Deliverable A). The role ARN is injected via var.execution_role_arn
+# so all IAM grants are reviewable in one place. No IAM resources are created
+# in the compute module anymore.
 
 # ---- Log group ------------------------------------------------------------
 # Pre-create the log group so the inline policy above can reference a real
@@ -149,7 +69,7 @@ resource "aws_security_group" "lambda" {
 
 resource "aws_lambda_function" "this" {
   function_name    = local.function_name
-  role             = aws_iam_role.lambda_exec.arn
+  role             = var.execution_role_arn
   handler          = "index.handler"
   runtime          = var.runtime
   memory_size      = var.memory_size
@@ -173,7 +93,5 @@ resource "aws_lambda_function" "this" {
 
   depends_on = [
     aws_cloudwatch_log_group.lambda,
-    aws_iam_role_policy.lambda_logs,
-    aws_iam_role_policy_attachment.vpc_access,
   ]
 }

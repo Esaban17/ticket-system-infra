@@ -16,8 +16,13 @@ import {
   User,
 } from '@prisma/client';
 
+import { Logger } from '@nestjs/common';
+
 import { PrismaService } from '@/prisma/prisma.service';
 import { UsersService } from '@/users/users.service';
+import { NotificationsService } from '@/notifications/notifications.service';
+import { resolveChannels } from '@/workers/notifications/channel-resolver.service';
+import { TicketNotifyType } from '@/workers/notifications/ticket-notification';
 import { requireOwnTicket } from '@/auth/ownership';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
@@ -51,10 +56,48 @@ export type TicketWithAttachments = Ticket & {
 
 @Injectable()
 export class TicketsService {
+  private readonly logger = new Logger(TicketsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  /**
+   * Encola (best-effort) un correo al REPORTANTE del ticket vía SQS (EP-12 /
+   * BL-119). Resuelve el email + preferencias del reportante y, solo si tiene el
+   * canal email habilitado (channel-resolver), arma un payload autocontenido
+   * { type, ticketId, recipientEmail, subject, body } que el consumer despacha
+   * con SES. NUNCA lanza: un fallo de SQS/resolución NO debe romper la
+   * transacción ni el lock optimista del cambio de ticket — solo se loguea.
+   */
+  private async notifyReporter(
+    ticket: Ticket,
+    type: TicketNotifyType,
+    subject: string,
+    body: string,
+  ): Promise<void> {
+    try {
+      const reporter = await this.prisma.user.findUnique({ where: { id: ticket.reporterId } });
+      if (!reporter) return;
+      // Respeta las preferencias: solo email cuando el reportante lo habilita.
+      if (!resolveChannels(reporter).includes('email')) return;
+
+      await this.notifications.enqueue({
+        type,
+        ticketId: ticket.id,
+        recipientEmail: reporter.email,
+        subject,
+        body,
+      });
+    } catch (err) {
+      // best-effort: el cambio de ticket ya se persistió; no propagamos.
+      this.logger.warn(
+        `No se pudo encolar la notificación ${type} del ticket ${ticket.id}: ${String(err)}`,
+      );
+    }
+  }
 
   /**
    * Crea un ticket (BL-014): valida (DTO), calcula prioridad, lee el SLA por
@@ -269,7 +312,17 @@ export class TicketsService {
         payload: { from_assignee_id: ticket.assigneeId, to_assignee_id: dto.assigneeId },
       },
     });
-    return this.prisma.ticket.findUniqueOrThrow({ where: { id } });
+
+    const updated = await this.prisma.ticket.findUniqueOrThrow({ where: { id } });
+    // EP-12 / BL-119: avisa al reportante que alguien ya está atendiendo el ticket.
+    await this.notifyReporter(
+      updated,
+      'ticket.assigned',
+      `[${updated.ticketNumber}] Tu ticket está siendo atendido`,
+      `Hola,\n\nUn agente fue asignado a tu ticket ${updated.ticketNumber} — "${updated.title}" y ` +
+        `ya está siendo atendido.\n\nIngresa al sistema para ver el detalle.\n\n— Sistema de Tickets`,
+    );
+    return updated;
   }
 
   /**
@@ -346,6 +399,56 @@ export class TicketsService {
             : { from_state: ticket.status, to_state: next },
       },
     });
-    return this.prisma.ticket.findUniqueOrThrow({ where: { id } });
+
+    const updated = await this.prisma.ticket.findUniqueOrThrow({ where: { id } });
+    // EP-12 / BL-119: al resolver, avisa al reportante que su ticket se cerró.
+    if (next === TicketStatus.resuelto) {
+      await this.notifyReporter(
+        updated,
+        'ticket.resolved',
+        `[${updated.ticketNumber}] Tu ticket fue resuelto`,
+        `Hola,\n\nTu ticket ${updated.ticketNumber} — "${updated.title}" fue marcado como resuelto.\n\n` +
+          `Solución: ${updated.solution ?? ''}\n\nIngresa al sistema para ver el detalle.\n\n— Sistema de Tickets`,
+      );
+    }
+    return updated;
+  }
+
+  /**
+   * Agrega un comentario a un ticket (EP-13 / BL-120). Valida existencia y, para
+   * un reportante, que el ticket sea suyo (403 si es ajeno). Crea un TicketEvent
+   * `comentario` (append-only, mismo patrón que los demás eventos) con el actor y
+   * el texto en el payload, y luego encola best-effort un correo `ticket.commented`
+   * al reportante (un fallo de notificación NO rompe la creación del comentario).
+   * Devuelve el evento creado.
+   */
+  async addComment(ticketId: string, actor: User, message: string) {
+    const ticket = await this.prisma.ticket.findUnique({ where: { id: ticketId } });
+    if (!ticket) {
+      throw new NotFoundException('Ticket no encontrado');
+    }
+    // RBAC: el reportante solo puede comentar SUS propios tickets; agente/admin, cualquiera.
+    if (actor.role === Role.reportante && ticket.reporterId !== actor.id) {
+      throw new ForbiddenException('No puedes comentar un ticket que no es tuyo');
+    }
+
+    const event = await this.prisma.ticketEvent.create({
+      data: {
+        ticketId,
+        actorId: actor.id,
+        eventType: EventType.comentario,
+        payload: { actor_id: actor.id, message },
+      },
+    });
+
+    // EP-12 / BL-119: avisa al reportante que su ticket recibió un comentario.
+    await this.notifyReporter(
+      ticket,
+      'ticket.commented',
+      `[${ticket.ticketNumber}] Nuevo comentario en tu ticket`,
+      `Hola,\n\nTu ticket ${ticket.ticketNumber} — "${ticket.title}" recibió un nuevo comentario:\n\n` +
+        `${message}\n\nIngresa al sistema para responder.\n\n— Sistema de Tickets`,
+    );
+    return event;
   }
 }

@@ -33,9 +33,15 @@ locals {
     "app.kubernetes.io/managed-by" = "terraform"
   }
 
-  # Prisma/libpq connection string. The password comes from the TF_VAR chain
-  # and is stored only in the Kubernetes Secret below — never in a ConfigMap.
-  database_url = "postgresql://${var.db_username}:${var.db_password}@${var.db_endpoint}/${var.db_name}?schema=public"
+  # Delivery 5 — Deliverable B: the password is NO LONGER baked into a
+  # DATABASE_URL inside a Kubernetes Secret. The RDS endpoint output is
+  # "host:port"; we split it so DB_HOST/DB_PORT travel through the non-sensitive
+  # ConfigMap. The API's secret-loader reads {username,password} from Secrets
+  # Manager (SECRET_ARN) and combines them with DB_HOST/DB_PORT/DB_NAME to build
+  # DATABASE_URL at startup. No credential ever lands in a ConfigMap.
+  db_endpoint_parts = split(":", var.db_endpoint)
+  db_host           = local.db_endpoint_parts[0]
+  db_port           = length(local.db_endpoint_parts) > 1 ? local.db_endpoint_parts[1] : "5432"
 }
 
 resource "kubernetes_namespace" "this" {
@@ -80,8 +86,21 @@ resource "kubernetes_config_map" "app" {
       TICKETS_RESOURCE          = var.app_resource
       # EP-14: proveedor de auth. mock = login por contraseña sigue activo.
       AUTH_PROVIDER = var.auth_provider
+      # D5-B: conexión a la BD. SECRET_ARN apunta al secret de credenciales en
+      # Secrets Manager; DB_HOST/DB_PORT/DB_NAME son NO sensibles y viajan por el
+      # ConfigMap. El secret-loader del API arma DATABASE_URL combinando
+      # {username,password} del secret + estos valores. La contraseña nunca
+      # aparece en el ConfigMap ni en un Secret de Kubernetes.
+      DB_HOST = local.db_host
+      DB_PORT = local.db_port
+      DB_NAME = var.db_name
     },
+    var.secret_arn != "" ? { SECRET_ARN = var.secret_arn } : {},
     var.sqs_queue_url != "" ? { SQS_QUEUE_URL = var.sqs_queue_url } : {},
+    # EP-12 / BL-119: remitente verificado de SES. Lo leen TANTO el API (al
+    # encolar arma el correo) como el consumer (DispatchService → SES). Vacío =
+    # no se inyecta y el DispatchService conserva el stub (solo loguea).
+    var.ses_from_address != "" ? { SES_FROM_ADDRESS = var.ses_from_address } : {},
     # CORS: necesario para el demo SSO (SPA en localhost → API del ALB).
     var.cors_origins != "" ? { CORS_ORIGINS = var.cors_origins } : {},
     # Config Cognito (no sensible: pool/client/dominio son públicos). Solo se
@@ -104,9 +123,11 @@ resource "random_password" "jwt" {
   special = false
 }
 
-# Sensitive configuration: DATABASE_URL (contains the DB password) and the
-# generated JWT_SECRET live ONLY in a Secret — never a ConfigMap, never
-# committed. DATABASE_URL is sourced from the TF_VAR_db_password chain.
+# Sensitive configuration. Delivery 5 — Deliverable B: DATABASE_URL is GONE
+# from this Secret. The DB password now lives ONLY in AWS Secrets Manager; the
+# pod fetches it at startup via IRSA (SECRET_ARN) and builds DATABASE_URL in
+# memory. This Secret now carries only the generated JWT_SECRET, which has no
+# AWS-managed home. Nothing here contains a database credential.
 resource "kubernetes_secret" "app" {
   metadata {
     name      = "${var.app_name}-secret"
@@ -115,8 +136,7 @@ resource "kubernetes_secret" "app" {
   }
 
   data = {
-    DATABASE_URL = local.database_url
-    JWT_SECRET   = random_password.jwt.result
+    JWT_SECRET = random_password.jwt.result
   }
 
   type = "Opaque"

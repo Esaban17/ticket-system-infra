@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -19,6 +20,7 @@ import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { ChangeStateDto } from './dto/change-state.dto';
+import { CreateCommentDto } from './dto/create-comment.dto';
 import { ListTicketsQuery, ListEventsQuery } from './dto/list-tickets.query';
 
 /**
@@ -86,5 +88,17 @@ export class TicketsController {
     @CurrentUser() user: User,
   ) {
     return this.tickets.changeState(id, dto, user);
+  }
+
+  // POST /v1/tickets/:id/comments — agrega un comentario (EP-13 / BL-120). 201 + evento.
+  // RBAC: reportante (solo sus propios tickets, validado en el service), agente y admin.
+  @Post(':id/comments')
+  @HttpCode(201)
+  addComment(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: CreateCommentDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.tickets.addComment(id, user, dto.message);
   }
 }

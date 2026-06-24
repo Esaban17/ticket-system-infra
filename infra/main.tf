@@ -17,8 +17,66 @@
 #                   subnets via subnet tags / nodegroup config later.
 # ---------------------------------------------------------------------------
 
+data "aws_caller_identity" "current" {}
+
 locals {
+  name_prefix      = "${var.project_name}-${var.environment}"
   eks_cluster_name = "${var.project_name}-${var.environment}-eks"
+
+  # Worker Lambda name shared by module.compute (name) and module.iam
+  # (function_name). module.iam composes the Lambda + log-group ARNs BY NAME to
+  # break the iam <-> compute dependency cycle; deriving both from one local
+  # keeps them in sync from a single edit (no repeated "worker" string literal).
+  worker_name          = "worker"
+  worker_function_name = "${var.project_name}-${var.environment}-${local.worker_name}"
+
+  # Delivery 5 — Deliverable B: runtime execution role ARNs composed BY NAME so
+  # the KMS key policy can grant them data-plane access WITHOUT referencing the
+  # IAM/IRSA resources (those reference module.kms.key_arn — referencing them
+  # back from kms would form a cycle). The names mirror exactly how the modules
+  # build them:
+  #   - Lambda exec role: "${function_name}-role" (module.iam aws_iam_role.lambda_exec,
+  #     function_name = local.worker_function_name = "${project}-${env}-worker").
+  #   - App IRSA role:    "${cluster_name}-app" (ingress/iam.tf module.app_irsa
+  #     role_name = "${var.cluster_name}-app", cluster_name = local.eks_cluster_name).
+  lambda_exec_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.worker_function_name}-role"
+  app_irsa_role_arn    = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.eks_cluster_name}-app"
+
+  kms_allowed_role_arns = [
+    local.lambda_exec_role_arn,
+    local.app_irsa_role_arn,
+  ]
+}
+
+# ---- KMS (Delivery 5 — Deliverable B) -------------------------------------
+# Single customer-managed CMK encrypting S3 (SSE-KMS), RDS storage and the DB
+# credentials secret. Declared FIRST so storage/database/secrets/iam can scope
+# their encryption + kms:Decrypt to module.kms.key_arn. The key policy grants
+# the runtime roles BY NAME (local.kms_allowed_role_arns) to avoid an
+# iam <-> kms cycle (iam references module.kms.key_arn; kms must NOT reference iam).
+
+module "kms" {
+  source = "./modules/kms"
+
+  name_prefix             = local.name_prefix
+  deletion_window_in_days = var.kms_deletion_window_in_days
+  allowed_role_arns       = local.kms_allowed_role_arns
+}
+
+# ---- Secrets (Delivery 5 — Deliverable B) ---------------------------------
+# Secrets Manager secret with the DB credentials {username,password}, encrypted
+# with the CMK. The PASSWORD is generated here and consumed by module.database,
+# so secrets does NOT depend on database (cycle-free). host/port/dbname are
+# non-sensitive and flow to the app via the ConfigMap, not this secret.
+
+module "secrets" {
+  source = "./modules/secrets"
+
+  name_prefix             = local.name_prefix
+  kms_key_arn             = module.kms.key_arn
+  username                = var.db_username
+  db_password             = var.db_password
+  recovery_window_in_days = var.environment == "prod" ? 7 : 0
 }
 
 # ---- Network --------------------------------------------------------------
@@ -60,6 +118,9 @@ module "storage" {
   bucket_name          = "${var.project_name}-${var.environment}-attachments-${var.tickets_bucket_suffix}"
   force_destroy        = var.environment != "prod"
   cors_allowed_origins = var.attachments_cors_allowed_origins
+
+  # D5-B: SSE-KMS with the project CMK (replaces SSE-S3/AES256).
+  kms_key_arn = module.kms.key_arn
 }
 
 # ---- Cognito (IdP / SSO Hosted UI — EP-14) --------------------------------
@@ -85,27 +146,66 @@ module "tls" {
   enable_validation = var.enable_https
 }
 
+# ---- IAM (Delivery 5 — Deliverable A: centralized IAM module) -------------
+# Single home for the four project IAM roles + the app/consumer policies:
+#   - lambda_exec  -> consumed by module.compute (execution_role_arn)
+#   - scheduler    -> consumed by module.scheduler (scheduler_role_arn)
+#   - app/consumer policies -> consumed by module.ingress IRSA roles
+#   - ci_runner + GitHub OIDC provider -> re-exposed at the root (Deliverable C)
+#
+# Declared BEFORE compute/scheduler/ingress so its outputs are available to
+# them. CYCLE NOTE: compute needs the execution role from iam, and iam needs
+# the Lambda ARN for the scheduler policy. To break the cycle, iam composes the
+# target Lambda ARN BY NAME (function_name) instead of reading
+# module.compute.function_arn — so iam does NOT depend on compute.
+
+module "iam" {
+  source = "./modules/iam"
+
+  name_prefix   = "${var.project_name}-${var.environment}"
+  environment   = var.environment
+  function_name = local.worker_function_name
+
+  bucket_arn    = module.storage.bucket_arn
+  sqs_queue_arn = module.async.queue_arn
+
+  # D5-B: scope the app IRSA + Lambda exec data-plane grants to the EXACT secret
+  # and CMK ARNs (secretsmanager:GetSecretValue + kms:Decrypt[/GenerateDataKey]).
+  # These reference module.kms/module.secrets, which is why kms grants its
+  # runtime roles BY NAME (no back-reference to iam) to stay cycle-free.
+  secret_arn  = module.secrets.secret_arn
+  kms_key_arn = module.kms.key_arn
+
+  # EP-12 / BL-119: scope ses:SendEmail/SendRawEmail (app + consumer IRSA) a la
+  # EXACTA identidad de email verificada (sin wildcard).
+  ses_identity_arn = module.ses.identity_arn
+
+  # target_lambda_arn left empty: iam composes it by name to avoid the
+  # iam <-> compute dependency cycle.
+}
+
 # ---- Compute (Lambda report-generator) -------------------------------------
 # The Lambda is reused from D2 but its handler is now the report-generator
 # (index.py) that lists async objects in S3 and writes a daily summary.
 # Invoked by the EventBridge Scheduler (module.scheduler) via the dedicated
-# scheduler IAM role (ADR 0013). S3 permissions are scoped to the specific
-# bucket ARN (no wildcard resources).
+# scheduler IAM role (centralized in module.iam, ADR 0013). S3 permissions are
+# scoped to the specific bucket ARN (no wildcard resources).
 
 module "compute" {
   source = "./modules/compute"
 
   environment     = var.environment
   project_name    = var.project_name
-  name            = "worker"
+  name            = local.worker_name
   memory_size     = var.lambda_memory_size
   timeout_seconds = var.lambda_timeout_seconds
   vpc_id          = module.network.vpc_id
   subnet_ids      = module.network.private_subnet_ids
 
+  # D5: execution role centralized in module.iam (no IAM in the compute module).
+  execution_role_arn = module.iam.lambda_exec_role_arn
+
   # D4: pass bucket so the Lambda can list and write S3 objects.
-  # enable_s3_access uses a static bool (not derived from module.storage)
-  # to avoid "count depends on apply-time value" on cold-start applies.
   bucket_name      = module.storage.bucket_id
   bucket_arn       = module.storage.bucket_arn
   enable_s3_access = true
@@ -119,14 +219,18 @@ module "compute" {
 module "database" {
   source = "./modules/database"
 
-  environment         = var.environment
-  project_name        = var.project_name
-  subnet_ids          = module.network.private_subnet_ids
-  security_group_ids  = [module.security.db_sg_id]
-  instance_class      = var.db_instance_class
-  multi_az            = var.db_multi_az
-  db_username         = var.db_username
-  db_password         = var.db_password
+  environment        = var.environment
+  project_name       = var.project_name
+  subnet_ids         = module.network.private_subnet_ids
+  security_group_ids = [module.security.db_sg_id]
+  instance_class     = var.db_instance_class
+  multi_az           = var.db_multi_az
+  db_username        = var.db_username
+  # D5-B: the master password now comes from the secrets module (generated or
+  # caller-provided) so RDS and the secret stay in sync — NOT from var.db_password
+  # directly (that var is only an optional override into module.secrets).
+  db_password         = module.secrets.password
+  kms_key_arn         = module.kms.key_arn
   deletion_protection = var.environment == "prod"
 }
 
@@ -207,11 +311,43 @@ module "alb_controller" {
   depends_on = [module.eks, module.network]
 }
 
+# ---- Container Insights (Delivery 5 — Deliverable G, opcional) ------------
+# Monitoring stack en EKS vía CloudWatch Container Insights: el CloudWatch agent
+# (DaemonSet) publica métricas de pods/nodos y Fluent Bit envía los logs de los
+# contenedores a CloudWatch Logs. Un único IRSA (CloudWatchAgentServerPolicy)
+# autentica ambos DaemonSets. depends_on sobre eks + alb_controller fuerza que el
+# cluster y el control-plane de Helm/IRSA existan antes de instalar los charts.
+
+module "container_insights" {
+  source = "./modules/container-insights"
+
+  cluster_name      = module.eks.cluster_name
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  region            = var.region
+
+  cloudwatch_metrics_chart_version = var.cloudwatch_metrics_chart_version
+  fluent_bit_chart_version         = var.fluent_bit_chart_version
+
+  depends_on = [module.eks, module.alb_controller]
+}
+
 # ---- Async Messaging Module (Delivery 4 — Deliverable A) ------------------
 # SQS main queue + DLQ. Standard queue (not FIFO) with a redrive policy that
 # moves messages to the DLQ after max_receive_count failed delivery attempts.
 # Wired into the ingress module (producer SQS URL + consumer IRSA) and the
 # keda module (queue ARN for scaling metric). See ADR 0010.
+
+# ---- SES (EP-12 / BL-119) -------------------------------------------------
+# Identidad de email verificada para los correos de notificación de tickets
+# (resuelto/comentado/asignado) que el sistema envía al reportante. Identidad de
+# email (no de dominio) = sin DNS, válida para el modo sandbox de SES. La
+# verificación del buzón es un paso manual fuera de Terraform.
+
+module "ses" {
+  source = "./modules/ses"
+
+  notification_email = var.notification_email
+}
 
 module "async" {
   source = "./modules/async"
@@ -235,6 +371,9 @@ module "scheduler" {
   schedule_expression = var.scheduler_expression
   target_lambda_arn   = module.compute.function_arn
   scheduler_timezone  = var.scheduler_timezone
+
+  # D5: scheduler role centralized in module.iam (lambda:InvokeFunction only).
+  scheduler_role_arn = module.iam.scheduler_role_arn
 }
 
 # ---- Ingress + app (Deliverable C + D, extended in D4) --------------------
@@ -266,11 +405,26 @@ module "ingress" {
   db_endpoint = module.database.endpoint
   db_name     = module.database.db_name
   db_username = var.db_username
-  db_password = var.db_password
+
+  # D5-B: the app reads the DB password from Secrets Manager at runtime (no
+  # cleartext DATABASE_URL Secret). SECRET_ARN + DB_HOST/DB_PORT/DB_NAME flow to
+  # the ConfigMap (DB_HOST/DB_PORT derived inside the module from db_endpoint).
+  # kms_key_arn documents the key; the IRSA kms:Decrypt grant lives in module.iam.
+  secret_arn  = module.secrets.secret_arn
+  kms_key_arn = module.kms.key_arn
 
   # D4: wire the SQS queue into the app ConfigMap (SQS_QUEUE_URL) and IRSA.
   sqs_queue_arn = module.async.queue_arn
   sqs_queue_url = module.async.queue_url
+
+  # EP-12 / BL-119: remitente verificado de SES inyectado en el ConfigMap
+  # (SES_FROM_ADDRESS), consumido por el app y el consumer (DispatchService).
+  ses_from_address = module.ses.from_address
+
+  # D5: app/consumer IAM policies centralized in module.iam; attached to the
+  # IRSA roles created here.
+  app_policy_arn      = module.iam.app_policy_arn
+  consumer_policy_arn = module.iam.consumer_policy_arn
 
   # Consumer Deployment settings.
   polling_batch_size = var.consumer_polling_batch_size
@@ -317,4 +471,40 @@ module "keda" {
 
   # keda module applies AFTER the cluster and ingress (consumer Deployment) exist.
   depends_on = [module.ingress]
+}
+
+# ---- Observability (Delivery 5 — Deliverable E) ---------------------------
+# CloudWatch log groups + alarms (Lambda Errors, SQS DLQ depth) + a dashboard,
+# all wired to an SNS alerts topic, plus a monthly AWS Budgets cost budget.
+# Log groups are encrypted with the project CMK. The alarms reference the
+# worker Lambda BY NAME (local.worker_function_name) and the DLQ name derived
+# from module.async.dlq_arn (SQS ARN's last colon segment is the queue name),
+# so this module does not add new cross-module dependency cycles.
+
+module "observability" {
+  source = "./modules/observability"
+
+  name_prefix = local.name_prefix
+  environment = var.environment
+  region      = var.region
+  kms_key_arn = module.kms.key_arn
+
+  # Alerting + budget.
+  alert_email        = var.alert_email
+  monthly_budget_usd = var.monthly_budget_usd
+
+  # Alarm targets.
+  lambda_function_name = local.worker_function_name
+  dlq_queue_name       = element(split(":", module.async.dlq_arn), length(split(":", module.async.dlq_arn)) - 1)
+
+  # Alarm tuning (all from root variables — no hardcoded thresholds/periods).
+  lambda_error_threshold   = var.lambda_error_threshold
+  dlq_depth_threshold      = var.dlq_depth_threshold
+  alarm_period_seconds     = var.alarm_period_seconds
+  alarm_evaluation_periods = var.alarm_evaluation_periods
+
+  # Dashboard dimensions. RDS identifier mirrors module.database
+  # (${project}-${env}-pg); the ALB suffix is left to the module default until
+  # the ingress module exposes the LoadBalancer ARN suffix.
+  rds_instance_identifier = "${local.name_prefix}-pg"
 }

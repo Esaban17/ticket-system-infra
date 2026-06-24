@@ -93,10 +93,21 @@ variable "db_username" {
   type        = string
 }
 
-variable "db_password" {
-  description = "Master password for the RDS instance. Flows in from the TF_VAR_db_password chain and is written into a Kubernetes Secret (never a ConfigMap, never committed)."
+# ---- Delivery 5 — Deliverable B: Secrets Manager + KMS ----------------------
+# The DB password is NO LONGER injected into a Kubernetes Secret in cleartext.
+# Instead the runtime reads it from Secrets Manager (SECRET_ARN) and composes
+# DATABASE_URL using DB_HOST/DB_PORT/DB_NAME from the non-sensitive ConfigMap.
+
+variable "secret_arn" {
+  description = "ARN of the Secrets Manager secret with the DB credentials (from module.secrets.secret_arn). Injected into the app/consumer/seed ConfigMap as SECRET_ARN; the API's secret-loader fetches {username,password} at startup. Empty ('') falls back to the legacy DATABASE_URL Secret."
   type        = string
-  sensitive   = true
+  default     = ""
+}
+
+variable "kms_key_arn" {
+  description = "ARN of the CMK (from module.kms.key_arn). Documents the key the pod must be able to kms:Decrypt to unwrap the secret ciphertext. Empty ('') = unset. NOTE: with the centralized IAM module (D5-A) the actual app IRSA kms:Decrypt statement lives in ./modules/iam (scoped to this key via module.iam.kms_key_arn); this variable is kept for compatibility/documentation. DB_HOST/DB_PORT are derived inside main.tf by splitting var.db_endpoint, so no separate db_host/db_port variable is needed."
+  type        = string
+  default     = ""
 }
 
 variable "web_security_group_id" {
@@ -108,6 +119,19 @@ variable "tags" {
   description = "Tags applied to the IAM resources created here."
   type        = map(string)
   default     = {}
+}
+
+# ---- Centralized IAM policies (Delivery 5 — Deliverable A) -----------------
+
+variable "app_policy_arn" {
+  description = "ARN of the app (producer/API) IAM policy, created by the centralized ./modules/iam module. Attached to the app IRSA role (S3 PutObject/GetObject/ListBucket on the attachments bucket + sqs:SendMessage on the async queue)."
+  type        = string
+}
+
+variable "consumer_policy_arn" {
+  description = "ARN of the consumer IAM policy, created by the centralized ./modules/iam module. Attached to the consumer IRSA role (sqs:ReceiveMessage/DeleteMessage/GetQueueAttributes + s3:PutObject). Only consumed when sqs_queue_arn is set."
+  type        = string
+  default     = ""
 }
 
 # ---- Web frontend (SPA) ----------------------------------------------------
@@ -159,6 +183,14 @@ variable "polling_batch_size" {
   description = "Maximum number of SQS messages the consumer retrieves per ReceiveMessage call. Passed to the consumer Deployment as POLLING_BATCH_SIZE."
   type        = number
   default     = 10
+}
+
+# ---- Notificaciones por email (EP-12 / BL-119) -----------------------------
+
+variable "ses_from_address" {
+  description = "Dirección verificada en SES usada como remitente de los correos de notificación de tickets (de module.ses.from_address). Se inyecta como SES_FROM_ADDRESS en el ConfigMap compartido por el app y el consumer; el DispatchService la usa como Source en SendEmail. Vacío ('') = el app conserva el comportamiento stub (solo loguea) y no se inyecta la clave."
+  type        = string
+  default     = ""
 }
 
 # ---- Auth / Cognito (EP-14) — fluyen al ConfigMap del API ------------------

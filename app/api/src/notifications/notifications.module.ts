@@ -13,5 +13,8 @@ import { NotificationsService } from './notifications.service';
 @Module({
   controllers: [NotificationsController],
   providers: [NotificationsService],
+  // Exportado para que TicketsService (EP-12 / BL-119) reuse el mismo productor
+  // SQS al encolar notificaciones de ticket (resuelto/comentado/asignado).
+  exports: [NotificationsService],
 })
 export class NotificationsModule {}

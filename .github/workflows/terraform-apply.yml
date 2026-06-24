@@ -44,10 +44,8 @@ jobs:
     if: ${{ vars.INFRA_AUTO_APPLY != 'false' }}
 
     permissions:
+      id-token: write
       contents: read
-
-    env:
-      TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -61,15 +59,20 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:            ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ vars.CI_RUNNER_ROLE_ARN }}
+          aws-region:     ${{ vars.AWS_REGION }}
 
       - name: Terraform Init (dev)
         run: terraform init -backend-config=envs/dev/backend-dev.hcl
         working-directory: infra/
 
+      # Cold-start safe (Deliverable F one-click): on a clean account the
+      # kubernetes/helm providers can't reach a not-yet-created EKS cluster, so a
+      # full plan fails. apply-dev no longer consumes this plan (it runs a
+      # two-phase apply), so a cold-start plan failure here must NOT block the
+      # pipeline — this step is a warm-state preview only.
       - name: Terraform Plan (dev)
+        continue-on-error: true
         run: |
           terraform plan \
             -var-file=envs/dev/dev.tfvars \
@@ -78,6 +81,7 @@ jobs:
         working-directory: infra/
 
       - name: Upload plan artifact
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-dev-${{ github.run_id }}
@@ -89,6 +93,7 @@ jobs:
       # machine with no build/ directory, so we ship the ZIP as a second
       # artifact that apply-dev downloads before running terraform apply.
       - name: Upload Lambda package artifact
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: lambda-build-${{ github.run_id }}
@@ -96,11 +101,13 @@ jobs:
           retention-days: 1
 
   # --------------------------------------------------------------------------
-  # Job 2: apply-dev
-  # Download the tfplan artifact and apply it without re-planning.
-  # terraform apply <planfile> cannot accept -target flags; the plan already
-  # encodes the correct dependency order. Since the dev EKS cluster already
-  # exists, a single apply is sufficient (no two-phase bootstrap needed).
+  # Job 2: apply-dev (two-phase, cold-start capable — Deliverable F one-click)
+  # Phase 1 creates the AWS infra (incl. EKS) so the Kubernetes/Helm providers
+  # have a reachable cluster; -target pulls each module's deps (iam, kms,
+  # secrets, network) transitively. Phase 2 applies the in-cluster stack. On a
+  # clean account this brings up all components from a single push; on warm
+  # state both phases are near no-ops plus any diff. Inline plan+apply rebuilds
+  # the Lambda ZIP in-session, so no plan/lambda artifact is consumed.
   # --------------------------------------------------------------------------
   apply-dev:
     name: Apply (dev)
@@ -114,10 +121,8 @@ jobs:
       cancel-in-progress: false
 
     permissions:
+      id-token: write
       contents: read
-
-    env:
-      TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -131,34 +136,40 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:            ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ vars.CI_RUNNER_ROLE_ARN }}
+          aws-region:     ${{ vars.AWS_REGION }}
 
       - name: Terraform Init (dev)
         run: terraform init -backend-config=envs/dev/backend-dev.hcl
         working-directory: infra/
 
-      # Download the exact binary plan produced by plan-dev — no re-plan.
-      # The plan file encodes the full dependency graph; Terraform applies
-      # resources in the correct order (EKS before in-cluster resources).
-      - name: Download plan artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan-dev-${{ github.run_id }}
-          path: infra/
+      # Phase 1: create AWS infra (network → EKS, SQS, scheduler) before the
+      # Kubernetes/Helm providers try to connect to a cluster that doesn't exist
+      # yet on a clean account. -target pulls in each module's dependencies
+      # (iam, kms, secrets, network) transitively.
+      - name: Apply infrastructure (network → eks, async, scheduler)
+        run: |
+          terraform apply -auto-approve \
+            -var-file=envs/dev/dev.tfvars \
+            -target=module.network \
+            -target=module.security \
+            -target=module.storage \
+            -target=module.registry \
+            -target=module.registry_web \
+            -target=module.compute \
+            -target=module.database \
+            -target=module.eks \
+            -target=module.async \
+            -target=module.scheduler
+        working-directory: infra/
 
-      # Restore the Lambda ZIP built by archive_file during plan-dev.
-      # Without this, aws_lambda_function fails with "no such file or directory"
-      # because the apply runner starts from a clean checkout.
-      - name: Download Lambda package artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: lambda-build-${{ github.run_id }}
-          path: infra/modules/compute/build/
-
-      - name: Apply plan (dev)
-        run: terraform apply tfplan
+      # Phase 2: apply everything else (iam, kms, secrets, observability,
+      # alb_controller, ingress, keda, container_insights) now that the cluster
+      # endpoint is live.
+      - name: Apply full stack (in-cluster + observability)
+        run: |
+          terraform apply -auto-approve \
+            -var-file=envs/dev/dev.tfvars
         working-directory: infra/
 
   # --------------------------------------------------------------------------
@@ -183,11 +194,8 @@ jobs:
     environment: staging
 
     permissions:
+      id-token: write
       contents: read
-
-    env:
-      # Staging uses a separate secret scoped to the GitHub Environment.
-      TF_VAR_db_password: ${{ secrets.STAGING_DB_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -201,9 +209,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:            ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ vars.CI_RUNNER_ROLE_ARN }}
+          aws-region:     ${{ vars.AWS_REGION }}
 
       - name: Terraform Init (staging)
         run: terraform init -backend-config=envs/staging/backend-staging.hcl

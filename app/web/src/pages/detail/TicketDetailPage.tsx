@@ -12,15 +12,17 @@ import {
 import { ErrorBanner } from '../../components/ui/ErrorBanner';
 import { Spinner } from '../../components/ui/Spinner';
 import { AttachmentsTab } from './AttachmentsTab';
+import { CommentsTab } from './CommentsTab';
 import { DetailTab } from './DetailTab';
 import { formatDateTime } from './helpers';
 import { HistoryTab } from './HistoryTab';
 
-type TabId = 'detalle' | 'historial' | 'adjuntos';
+type TabId = 'detalle' | 'historial' | 'comentarios' | 'adjuntos';
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'detalle', label: 'Detalle' },
   { id: 'historial', label: 'Historial' },
+  { id: 'comentarios', label: 'Comentarios' },
   { id: 'adjuntos', label: 'Adjuntos' },
 ];
 
@@ -171,6 +173,7 @@ export function TicketDetailPage() {
       {activeTab === 'historial' && (
         <HistoryTab ticketId={ticket.id} ticketNumber={ticket.ticketNumber} />
       )}
+      {activeTab === 'comentarios' && <CommentsTab ticketId={ticket.id} />}
       {activeTab === 'adjuntos' && <AttachmentsTab ticket={ticket} />}
     </div>
   );

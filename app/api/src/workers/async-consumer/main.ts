@@ -21,12 +21,11 @@
  *   POLLING_BATCH_SIZE         — max messages per ReceiveMessage call (default: 10)
  */
 
-import {
-  SQSClient,
-  ReceiveMessageCommand,
-  DeleteMessageCommand,
-} from '@aws-sdk/client-sqs';
+import { SQSClient, ReceiveMessageCommand, DeleteMessageCommand } from '@aws-sdk/client-sqs';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+
+import { DispatchService } from '../notifications/dispatch.service';
+import { isTicketNotification } from '../notifications/ticket-notification';
 
 // ---- Configuration ----------------------------------------------------------
 
@@ -41,10 +40,57 @@ const POLL_INTERVAL_MS = 1000; // pause between empty polls
 
 const sqsClient = new SQSClient({ region: REGION });
 const s3Client = new S3Client({ region: REGION });
+const dispatch = new DispatchService();
 
 // ---- Main polling loop ------------------------------------------------------
 
+/**
+ * Procesa un mensaje de notificación de ticket (EP-12 / BL-119): envía un correo
+ * REAL al reportante vía SES (DispatchService). El mensaje es autocontenido
+ * (recipientEmail/subject/body resueltos por el productor), así que el consumer
+ * no necesita la BD. El reportante recibe email solo porque el productor ya
+ * resolvió el canal según sus preferencias (channel-resolver).
+ */
+async function processTicketNotification(
+  messageId: string,
+  payload: {
+    type: string;
+    ticketId: string;
+    recipientEmail: string;
+    subject: string;
+    body: string;
+  },
+): Promise<void> {
+  await dispatch.sendEmail(payload.recipientEmail, {
+    subject: payload.subject,
+    body: payload.body,
+  });
+
+  console.log(
+    JSON.stringify({
+      event: 'notification_sent',
+      messageId,
+      type: payload.type,
+      ticketId: payload.ticketId,
+    }),
+  );
+}
+
 async function processMessage(messageId: string, body: string): Promise<void> {
+  // Routing por 'type': los mensajes de notificación de ticket disparan un
+  // correo; cualquier otro mensaje conserva el flujo existente de S3 (D4).
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    parsed = null;
+  }
+
+  if (isTicketNotification(parsed)) {
+    await processTicketNotification(messageId, parsed);
+    return;
+  }
+
   const key = `async/${messageId}`;
 
   await s3Client.send(
@@ -129,9 +175,7 @@ async function poll(): Promise<void> {
       } catch (err) {
         // Leave the message in the queue — SQS will redeliver after
         // visibility timeout. After maxReceiveCount attempts it moves to DLQ.
-        console.error(
-          JSON.stringify({ event: 'processing_error', messageId, error: String(err) }),
-        );
+        console.error(JSON.stringify({ event: 'processing_error', messageId, error: String(err) }));
       }
     }
   }

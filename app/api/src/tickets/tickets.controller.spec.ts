@@ -21,7 +21,11 @@ function res() {
 }
 
 describe('TicketsController', () => {
-  const service = { create: jest.fn(), getForUser: jest.fn() } as unknown as TicketsService;
+  const service = {
+    create: jest.fn(),
+    getForUser: jest.fn(),
+    addComment: jest.fn(),
+  } as unknown as TicketsService;
   const controller = new TicketsController(service);
   afterEach(() => jest.clearAllMocks());
 
@@ -48,5 +52,12 @@ describe('TicketsController', () => {
     (service.getForUser as jest.Mock).mockResolvedValue({ id: 't1' });
     void controller.getOne('t1', user);
     expect(service.getForUser).toHaveBeenCalledWith('t1', user);
+  });
+
+  it('POST comments delega a addComment con (id, user, message)', async () => {
+    (service.addComment as jest.Mock).mockResolvedValue({ id: 'ev1' });
+    const r = await controller.addComment('t1', { message: 'hola' }, user);
+    expect(service.addComment).toHaveBeenCalledWith('t1', user, 'hola');
+    expect(r).toEqual({ id: 'ev1' });
   });
 });
