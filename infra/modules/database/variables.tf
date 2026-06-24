@@ -81,6 +81,11 @@ variable "db_password" {
   }
 }
 
+variable "kms_key_arn" {
+  description = "ARN of the customer-managed KMS key (CMK) used to encrypt the RDS storage (storage_encrypted=true + kms_key_id). From module.kms.key_arn — Delivery 5 Deliverable B. Without it RDS would fall back to the default aws/rds key."
+  type        = string
+}
+
 variable "deletion_protection" {
   description = "If true, the RDS instance cannot be destroyed by terraform. Set to true in prod."
   type        = bool

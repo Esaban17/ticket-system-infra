@@ -166,14 +166,23 @@ variable "db_username" {
 }
 
 variable "db_password" {
-  description = "Master password for the RDS instance. MUST be provided via the TF_VAR_db_password environment variable — never via .tfvars or .tf files committed to git."
+  description = "OPTIONAL master password override for the RDS instance. Delivery 5 — Deliverable B: when null (the default) the secrets module GENERATES a strong random password and stores it in Secrets Manager; RDS consumes that same value. Provide a non-null value (>=12 chars) only to adopt an existing/external password — and prefer the TF_VAR_db_password environment variable over any committed file. TF_VAR_db_password is no longer REQUIRED in CI (the change to the workflows is left to Deliverable C)."
   type        = string
+  default     = null
   sensitive   = true
 
   validation {
-    condition     = length(var.db_password) >= 12
-    error_message = "db_password must be at least 12 characters long."
+    condition     = var.db_password == null || length(var.db_password) >= 12
+    error_message = "db_password must be null (auto-generate) or at least 12 characters long."
   }
+}
+
+# ---- KMS (Delivery 5 — Deliverable B) -------------------------------------
+
+variable "kms_deletion_window_in_days" {
+  description = "Days AWS waits before permanently deleting the project CMK after ScheduleKeyDeletion. 7 (minimum) keeps dev teardown fast; raise toward 30 in prod for an undo window."
+  type        = number
+  default     = 7
 }
 
 # ---- ECR (container registries) ------------------------------------------

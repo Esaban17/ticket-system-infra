@@ -27,9 +27,22 @@ resource "kubernetes_job" "db_seed" {
         restart_policy       = "Never"
 
         container {
-          name    = "seed"
-          image   = "${var.image}:${var.image_tag}"
-          command = ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/seed.js"]
+          name  = "seed"
+          image = "${var.image}:${var.image_tag}"
+          # D5-B: the seed runs the Prisma CLI (migrate deploy) which needs
+          # DATABASE_URL in the process env BEFORE it starts. The secret-cli
+          # wrapper fetches {username,password} from Secrets Manager (SECRET_ARN),
+          # composes DATABASE_URL from DB_HOST/DB_PORT/DB_NAME, exports it into
+          # the environment, then exec's the given command. So both
+          # `prisma migrate deploy` and `node dist/seed.js` inherit DATABASE_URL
+          # without it ever being stored in a ConfigMap or Kubernetes Secret.
+          command = [
+            "node",
+            "dist/config/secret-cli.js",
+            "sh",
+            "-c",
+            "node_modules/.bin/prisma migrate deploy && node dist/seed.js",
+          ]
 
           env_from {
             config_map_ref {

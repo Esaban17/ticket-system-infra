@@ -93,10 +93,21 @@ variable "db_username" {
   type        = string
 }
 
-variable "db_password" {
-  description = "Master password for the RDS instance. Flows in from the TF_VAR_db_password chain and is written into a Kubernetes Secret (never a ConfigMap, never committed)."
+# ---- Delivery 5 — Deliverable B: Secrets Manager + KMS ----------------------
+# The DB password is NO LONGER injected into a Kubernetes Secret in cleartext.
+# Instead the runtime reads it from Secrets Manager (SECRET_ARN) and composes
+# DATABASE_URL using DB_HOST/DB_PORT/DB_NAME from the non-sensitive ConfigMap.
+
+variable "secret_arn" {
+  description = "ARN of the Secrets Manager secret with the DB credentials (from module.secrets.secret_arn). Injected into the app/consumer/seed ConfigMap as SECRET_ARN; the API's secret-loader fetches {username,password} at startup. Empty ('') falls back to the legacy DATABASE_URL Secret."
   type        = string
-  sensitive   = true
+  default     = ""
+}
+
+variable "kms_key_arn" {
+  description = "ARN of the CMK (from module.kms.key_arn). Documents the key the pod must be able to kms:Decrypt to unwrap the secret ciphertext. Empty ('') = unset. NOTE: with the centralized IAM module (D5-A) the actual app IRSA kms:Decrypt statement lives in ./modules/iam (scoped to this key via module.iam.kms_key_arn); this variable is kept for compatibility/documentation. DB_HOST/DB_PORT are derived inside main.tf by splitting var.db_endpoint, so no separate db_host/db_port variable is needed."
+  type        = string
+  default     = ""
 }
 
 variable "web_security_group_id" {

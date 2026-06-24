@@ -13,6 +13,11 @@ variable "bucket_name" {
   type        = string
 }
 
+variable "kms_key_arn" {
+  description = "ARN of the customer-managed KMS key (CMK) used for server-side encryption of bucket objects (SSE-KMS). From module.kms.key_arn. Replaces the previous SSE-S3 (AES256) default — Delivery 5 Deliverable B."
+  type        = string
+}
+
 variable "force_destroy" {
   description = "If true, Terraform may destroy the bucket even when it contains objects. Acceptable in dev; in prod this MUST be false to protect real data."
   type        = bool

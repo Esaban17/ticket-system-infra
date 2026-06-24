@@ -39,6 +39,25 @@ variable "target_lambda_arn" {
   default     = ""
 }
 
+# ---- Secrets Manager + KMS (Delivery 5 — Deliverable B) ---------------------
+# Scope the runtime data-plane grants to the EXACT secret + key ARNs (no
+# wildcards). When set: the app (IRSA) policy gets secretsmanager:GetSecretValue
+# + kms:Decrypt/DescribeKey, and the Lambda execution role gets
+# secretsmanager:GetSecretValue + kms:Decrypt/GenerateDataKey (the bucket is now
+# SSE-KMS so PutObject must wrap a data key). Empty ('') omits the statements.
+
+variable "secret_arn" {
+  description = "ARN of the Secrets Manager secret with the DB credentials (from module.secrets.secret_arn). When set, the app IRSA policy and the Lambda execution role get secretsmanager:GetSecretValue scoped to THIS exact ARN (no wildcard). Empty ('') omits the statement."
+  type        = string
+  default     = ""
+}
+
+variable "kms_key_arn" {
+  description = "ARN of the CMK (from module.kms.key_arn). When set, the app IRSA policy gets kms:Decrypt+DescribeKey and the Lambda execution role gets kms:Decrypt+GenerateDataKey, scoped to THIS exact key (no wildcard): Decrypt to unwrap the secret, GenerateDataKey because the attachments bucket now uses SSE-KMS and the Lambda's s3:PutObject must wrap object data keys. Empty ('') omits the statements."
+  type        = string
+  default     = ""
+}
+
 variable "github_org" {
   description = "GitHub organization/owner that owns the repository allowed to assume the CI runner role via OIDC. Used in the trust policy sub condition (repo:<org>/<repo>:ref:<branch_ref>). MUST be the repo's CURRENT owner as it appears in the GitHub Actions OIDC token sub claim — the 'gitcombo' remote URL is a redirect to the renamed owner 'Esaban17', and OIDC emits the current name."
   type        = string
