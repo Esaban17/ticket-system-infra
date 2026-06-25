@@ -16,6 +16,18 @@ on:
     paths:
       - "infra/**"
       - ".github/workflows/terraform-apply.yml"
+  # Manual / bot trigger (the Slack /deploy bot — Deliverable J — calls this via
+  # the workflow_dispatch REST endpoint). 'environment' selects the target env.
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment to apply"
+        required: false
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - staging
 
 # Never run two applies against the same environment's remote state at once.
 concurrency:

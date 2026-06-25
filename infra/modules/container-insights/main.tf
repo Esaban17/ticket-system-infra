@@ -62,6 +62,28 @@ resource "kubernetes_namespace" "amazon_cloudwatch" {
   }
 }
 
+# Single ServiceAccount shared by BOTH the CloudWatch agent and Fluent Bit
+# DaemonSets, owned by Terraform and annotated with the IRSA role. Previously
+# each Helm release set serviceAccount.create=true with the same name, so the
+# second release failed with "serviceaccounts cloudwatch-agent already exists".
+# Creating it once here (both charts use serviceAccount.create=false) removes the
+# collision and the race.
+resource "kubernetes_service_account" "cloudwatch_agent" {
+  metadata {
+    name      = var.service_account_name
+    namespace = kubernetes_namespace.amazon_cloudwatch.metadata[0].name
+
+    annotations = {
+      "eks.amazonaws.com/role-arn" = module.cloudwatch_agent_irsa.iam_role_arn
+    }
+
+    labels = {
+      "app.kubernetes.io/managed-by" = "terraform"
+      "app.kubernetes.io/part-of"    = "container-insights"
+    }
+  }
+}
+
 # ---- CloudWatch agent (métricas de Container Insights) ----------------------
 # DaemonSet que recolecta métricas de nodos/pods y las publica en el namespace
 # ContainerInsights de CloudWatch. El ServiceAccount lo crea el chart y se anota
@@ -80,7 +102,7 @@ resource "helm_release" "aws_cloudwatch_metrics" {
 
   set {
     name  = "serviceAccount.create"
-    value = "true"
+    value = "false"
   }
 
   set {
@@ -88,12 +110,7 @@ resource "helm_release" "aws_cloudwatch_metrics" {
     value = var.service_account_name
   }
 
-  set {
-    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = module.cloudwatch_agent_irsa.iam_role_arn
-  }
-
-  depends_on = [module.cloudwatch_agent_irsa]
+  depends_on = [kubernetes_service_account.cloudwatch_agent]
 }
 
 # ---- Fluent Bit (logs de contenedores → CloudWatch Logs) --------------------
@@ -109,17 +126,12 @@ resource "helm_release" "aws_for_fluent_bit" {
 
   set {
     name  = "serviceAccount.create"
-    value = "true"
+    value = "false"
   }
 
   set {
     name  = "serviceAccount.name"
     value = var.service_account_name
-  }
-
-  set {
-    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = module.cloudwatch_agent_irsa.iam_role_arn
   }
 
   # Región de los log groups de CloudWatch Logs a los que Fluent Bit escribe.
@@ -134,5 +146,5 @@ resource "helm_release" "aws_for_fluent_bit" {
     value = "/aws/containerinsights/${var.cluster_name}/application"
   }
 
-  depends_on = [module.cloudwatch_agent_irsa]
+  depends_on = [kubernetes_service_account.cloudwatch_agent]
 }
