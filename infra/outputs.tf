@@ -195,6 +195,23 @@ output "keda_irsa_role_arn" {
 }
 
 output "consumer_role_arn" {
-  description = "ARN of the consumer pod IRSA role (sqs:ReceiveMessage/DeleteMessage/GetQueueAttributes + s3:PutObject)."
+  description = "ARN of the consumer pod IRSA role (sqs:ReceiveMessage/DeleteMessage/GetQueueAttributes + s3:PutObject + ses:SendEmail + sns:Publish when notifications are wired)."
   value       = module.ingress.consumer_role_arn
+}
+
+# ---- Observability + Alerting (Delivery 5) --------------------------------
+
+output "alerts_topic_arn" {
+  description = "ARN of the SNS alerts topic. Target of the CloudWatch alarms and of the consumer's ops-alert publishes."
+  value       = module.observability.alerts_topic_arn
+}
+
+output "alarm_names" {
+  description = "Names of the CloudWatch alarms wired to the alerts topic (DLQ not empty, async backlog age, Lambda errors)."
+  value       = module.observability.alarm_names
+}
+
+output "api_log_group_name" {
+  description = "Name of the API application CloudWatch log group provisioned by the observability module."
+  value       = module.observability.api_log_group_name
 }

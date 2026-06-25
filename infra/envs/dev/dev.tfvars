@@ -48,3 +48,19 @@ scheduler_timezone   = "UTC"
 # defaults ("d3" / "bootstrap") causing unwanted rollbacks / ImagePullBackOff.
 api_image_tag = "c8d1d66"
 web_image_tag = "c8d1d66"
+
+# Notifications — Delivery 5 (SES email + SNS ops alerts).
+# SES: the async consumer sends notification emails from this verified sender.
+# The domain quattro.com.gt is verified in this account (production access), so
+# the consumer can email any recipient. ses_identity_arn scopes ses:SendEmail to
+# that identity (least privilege, no wildcard).
+ses_from_address = "no-reply@quattro.com.gt"
+ses_identity_arn = "arn:aws:ses:us-east-1:203036352580:identity/quattro.com.gt"
+
+# SNS: the observability module creates the ticket-system-dev-alerts topic and
+# the CloudWatch alarms that publish to it; the consumer also publishes ops
+# alerts there. Set alerts_email to have Terraform manage the ops email
+# subscription (a confirmation email is sent). Left empty here because a manual
+# subscription to ops@nextcodegt.com already exists in the account; set it to
+# let TF own the subscription instead.
+# alerts_email = "ops@nextcodegt.com"

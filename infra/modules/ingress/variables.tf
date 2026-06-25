@@ -160,3 +160,23 @@ variable "polling_batch_size" {
   type        = number
   default     = 10
 }
+
+# ---- Notifications: SES (email) + SNS (ops alerts) — Delivery 5 --------------
+
+variable "ses_from_address" {
+  description = "Verified SES sender address (e.g. no-reply@quattro.com.gt) used by the consumer to send notification emails. Injected into the ConfigMap as SES_FROM_ADDRESS and gates the consumer IRSA ses:SendEmail statement. Empty disables SES wiring (backward-compatible)."
+  type        = string
+  default     = ""
+}
+
+variable "ses_identity_arn" {
+  description = "ARN of the verified SES identity (domain or email) the consumer is allowed to send from, e.g. arn:aws:ses:us-east-1:<acct>:identity/quattro.com.gt. Used to scope the consumer's ses:SendEmail to that identity instead of '*'. When empty, the SES statement falls back to resource '*' (SES does not support per-recipient ARN scoping; see E5 §10)."
+  type        = string
+  default     = ""
+}
+
+variable "sns_alerts_topic_arn" {
+  description = "ARN of the SNS alerts topic (from the observability module). Injected into the ConfigMap as SNS_ALERTS_TOPIC_ARN and scopes the consumer IRSA sns:Publish statement. Empty disables SNS wiring (backward-compatible)."
+  type        = string
+  default     = ""
+}

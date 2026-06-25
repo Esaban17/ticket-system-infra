@@ -70,6 +70,9 @@ resource "kubernetes_config_map" "app" {
   #   SQS_QUEUE_URL (Delivery 4): consumed by the producer (POST /enqueue) and
   #   the consumer Deployment. Populated from module.async.queue_url output at
   #   the root — no hardcoded URLs.
+  #   SES_FROM_ADDRESS / SNS_ALERTS_TOPIC_ARN (Delivery 5): consumed by the
+  #   consumer to send notification emails (SES) and publish ops alerts (SNS).
+  #   Both are non-secret and only added when provided by the root.
   data = merge(
     {
       AWS_REGION                = var.region
@@ -79,7 +82,9 @@ resource "kubernetes_config_map" "app" {
       PORT                      = tostring(var.app_port)
       TICKETS_RESOURCE          = var.app_resource
     },
-    var.sqs_queue_url != "" ? { SQS_QUEUE_URL = var.sqs_queue_url } : {}
+    var.sqs_queue_url != "" ? { SQS_QUEUE_URL = var.sqs_queue_url } : {},
+    var.ses_from_address != "" ? { SES_FROM_ADDRESS = var.ses_from_address } : {},
+    var.sns_alerts_topic_arn != "" ? { SNS_ALERTS_TOPIC_ARN = var.sns_alerts_topic_arn } : {}
   )
 }
 

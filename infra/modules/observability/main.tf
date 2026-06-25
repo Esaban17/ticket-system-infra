@@ -61,3 +61,103 @@ resource "aws_cloudwatch_log_group" "eks" {
     Component = "eks"
   })
 }
+
+# ---------------------------------------------------------------------------
+# Alerting — SNS topic + CloudWatch alarms (Delivery 5, §11).
+#
+# A single SNS topic ("<prefix>-alerts") is the fan-out point for operational
+# alerts. Two producers publish to it:
+#   1. CloudWatch alarms (defined below) — infra-level signals.
+#   2. The async consumer (app-level) — publishes when a message is about to
+#      land in the DLQ (sns:Publish via its IRSA role).
+#
+# The topic is intentionally NOT KMS-encrypted: email subscriptions to an
+# encrypted topic require a customer-managed key whose policy grants SNS the
+# CMK, which is out of scope here; alert payloads carry no secrets.
+# ---------------------------------------------------------------------------
+
+resource "aws_sns_topic" "alerts" {
+  name = "${var.name_prefix}-alerts"
+
+  tags = merge(local.common_tags, {
+    Name      = "${var.name_prefix}-alerts"
+    Component = "alerts"
+  })
+}
+
+# Email subscription (operations inbox). Only created when an address is given.
+# AWS sends a confirmation email; the subscription stays "pending" until the
+# recipient clicks the link (expected, surfaced as SubscriptionsPending).
+resource "aws_sns_topic_subscription" "alerts_email" {
+  count     = var.alerts_email != "" ? 1 : 0
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "email"
+  endpoint  = var.alerts_email
+}
+
+# ---- Alarm 1: DLQ not empty -------------------------------------------------
+# Any message in the dead-letter queue means a message failed processing after
+# maxReceiveCount attempts — a real incident worth paging on.
+resource "aws_cloudwatch_metric_alarm" "dlq_not_empty" {
+  count = var.enable_alarms && var.dlq_queue_name != "" ? 1 : 0
+
+  alarm_name          = "${var.name_prefix}-dlq-not-empty"
+  namespace           = "AWS/SQS"
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  dimensions          = { QueueName = var.dlq_queue_name }
+  statistic           = "Maximum"
+  period              = 60
+  evaluation_periods  = 1
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_description   = "Hay mensajes en la DLQ async: un mensaje no pudo procesarse tras los reintentos."
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  ok_actions          = [aws_sns_topic.alerts.arn]
+
+  tags = local.common_tags
+}
+
+# ---- Alarm 2: consumer backlog (oldest message age) -------------------------
+# A growing age of the oldest message in the main queue signals the consumer is
+# down or not keeping up (KEDA stuck at 0, crashloop, etc.).
+resource "aws_cloudwatch_metric_alarm" "queue_backlog_age" {
+  count = var.enable_alarms && var.main_queue_name != "" ? 1 : 0
+
+  alarm_name          = "${var.name_prefix}-async-backlog-age"
+  namespace           = "AWS/SQS"
+  metric_name         = "ApproximateAgeOfOldestMessage"
+  dimensions          = { QueueName = var.main_queue_name }
+  statistic           = "Maximum"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = var.queue_age_alarm_seconds
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_description   = "El mensaje más antiguo de la cola async supera el umbral: el consumer puede estar caído o saturado."
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  ok_actions          = [aws_sns_topic.alerts.arn]
+
+  tags = local.common_tags
+}
+
+# ---- Alarm 3: Lambda errors -------------------------------------------------
+# Errors in the report-generator Lambda (invoked daily by EventBridge Scheduler).
+resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
+  count = var.enable_alarms && var.lambda_function_name != "" ? 1 : 0
+
+  alarm_name          = "${var.name_prefix}-lambda-errors"
+  namespace           = "AWS/Lambda"
+  metric_name         = "Errors"
+  dimensions          = { FunctionName = var.lambda_function_name }
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 0
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_description   = "El Lambda report-generator registró errores en la última ventana."
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+
+  tags = local.common_tags
+}

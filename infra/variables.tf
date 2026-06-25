@@ -235,3 +235,29 @@ variable "scheduler_timezone" {
   type        = string
   default     = "UTC"
 }
+
+# ---- Observability + Notifications (Delivery 5) ---------------------------
+
+variable "log_retention_in_days" {
+  description = "Default CloudWatch Logs retention (days) for the observability module's log groups."
+  type        = number
+  default     = 14
+}
+
+variable "alerts_email" {
+  description = "Email subscribed to the SNS alerts topic (operations inbox). AWS sends a confirmation email; the subscription stays pending until confirmed. Empty ('') provisions the topic and alarms without an email subscription."
+  type        = string
+  default     = ""
+}
+
+variable "ses_from_address" {
+  description = "Verified SES sender address used by the async consumer to send notification emails (e.g. no-reply@quattro.com.gt). Must belong to a verified SES identity. Empty ('') leaves SES unwired (consumer keeps writing to S3 only)."
+  type        = string
+  default     = ""
+}
+
+variable "ses_identity_arn" {
+  description = "ARN of the verified SES identity the consumer may send from (e.g. arn:aws:ses:us-east-1:<acct>:identity/quattro.com.gt). Scopes the consumer's ses:SendEmail to that identity; empty falls back to resource '*'."
+  type        = string
+  default     = ""
+}

@@ -50,3 +50,41 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# ---- Alerting (SNS topic + CloudWatch alarms) ------------------------------
+
+variable "alerts_email" {
+  description = "Email address subscribed to the alerts SNS topic (operations inbox). AWS sends a confirmation email; the subscription is pending until confirmed. Empty ('') creates the topic without an email subscription."
+  type        = string
+  default     = ""
+}
+
+variable "enable_alarms" {
+  description = "Whether to create the CloudWatch alarms that publish to the alerts topic. Disable to provision only the topic (e.g., while wiring subscribers)."
+  type        = bool
+  default     = true
+}
+
+variable "dlq_queue_name" {
+  description = "Name of the async dead-letter queue (QueueName dimension for the DLQ alarm). Empty disables the DLQ alarm."
+  type        = string
+  default     = ""
+}
+
+variable "main_queue_name" {
+  description = "Name of the async main queue (QueueName dimension for the backlog-age alarm). Empty disables that alarm."
+  type        = string
+  default     = ""
+}
+
+variable "lambda_function_name" {
+  description = "Name of the report-generator Lambda (FunctionName dimension for the Lambda errors alarm). Empty disables that alarm."
+  type        = string
+  default     = ""
+}
+
+variable "queue_age_alarm_seconds" {
+  description = "Threshold (seconds) for the oldest-message-age alarm on the main queue. Breaches when the oldest message is older than this for 5 consecutive minutes."
+  type        = number
+  default     = 900
+}

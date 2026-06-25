@@ -200,6 +200,26 @@ module "async" {
   dlq_message_retention_seconds = var.sqs_dlq_retention_seconds
 }
 
+# ---- Observability + Alerting (Delivery 5 — §11) -------------------------
+# CloudWatch log groups (API + EKS) plus the SNS alerts topic and the alarms
+# that publish to it (DLQ not empty, async backlog age, Lambda errors). The
+# topic ARN is wired into the ingress module so the async consumer can publish
+# operational alerts (sns:Publish) to the SAME topic the alarms use.
+
+module "observability" {
+  source = "./modules/observability"
+
+  name_prefix           = "${var.project_name}-${var.environment}"
+  environment           = var.environment
+  log_retention_in_days = var.log_retention_in_days
+
+  # Alerting: SNS topic + alarms over the async queues and the Lambda.
+  alerts_email         = var.alerts_email
+  dlq_queue_name       = module.async.dlq_name
+  main_queue_name      = module.async.queue_name
+  lambda_function_name = module.compute.function_name
+}
+
 # ---- Scheduled Jobs (Delivery 4 — Deliverable C) --------------------------
 # EventBridge Scheduler invokes the report-generator Lambda on a cron schedule.
 # A dedicated scheduler IAM role with lambda:InvokeFunction scoped to the
@@ -251,6 +271,13 @@ module "ingress" {
 
   # Consumer Deployment settings.
   polling_batch_size = var.consumer_polling_batch_size
+
+  # D5: notifications. The consumer sends emails via SES (from a verified
+  # identity) and publishes ops alerts to the observability SNS topic. Empty
+  # ses_from_address leaves SES unwired (backward-compatible).
+  ses_from_address     = var.ses_from_address
+  ses_identity_arn     = var.ses_identity_arn
+  sns_alerts_topic_arn = module.observability.alerts_topic_arn
 
   depends_on = [module.alb_controller]
 }

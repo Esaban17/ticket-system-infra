@@ -101,12 +101,38 @@ data "aws_iam_policy_document" "consumer" {
     actions   = ["s3:PutObject"]
     resources = ["${var.bucket_arn}/*"]
   }
+
+  # SES (Delivery 5) — el consumer envía los correos de notificación. ses:SendEmail
+  # se scopea a la IDENTIDAD verificada (var.ses_identity_arn) cuando se provee;
+  # SES no admite scoping por destinatario en IAM (la restricción real es que el
+  # remitente pertenezca a una identidad verificada). Sólo se añade si hay remitente.
+  dynamic "statement" {
+    for_each = var.ses_from_address != "" ? [1] : []
+    content {
+      sid       = "AllowConsumerToSendEmailViaSES"
+      effect    = "Allow"
+      actions   = ["ses:SendEmail", "ses:SendRawEmail"]
+      resources = [var.ses_identity_arn != "" ? var.ses_identity_arn : "*"]
+    }
+  }
+
+  # SNS (Delivery 5) — el consumer publica alertas operativas al topic de alertas
+  # (mismo topic que reciben las alarmas de CloudWatch). Scoped al ARN del topic.
+  dynamic "statement" {
+    for_each = var.sns_alerts_topic_arn != "" ? [1] : []
+    content {
+      sid       = "AllowConsumerToPublishAlerts"
+      effect    = "Allow"
+      actions   = ["sns:Publish"]
+      resources = [var.sns_alerts_topic_arn]
+    }
+  }
 }
 
 resource "aws_iam_policy" "consumer" {
   count       = var.sqs_queue_arn != "" ? 1 : 0
   name        = "${var.cluster_name}-consumer-sqs-s3"
-  description = "Least-privilege SQS + S3 access for the ticket-system async consumer pods (ReceiveMessage/DeleteMessage/GetQueueAttributes on async queue; PutObject on attachments bucket)."
+  description = "Least-privilege access for the ticket-system async consumer pods: SQS ReceiveMessage/DeleteMessage/GetQueueAttributes on the async queue, S3 PutObject on the attachments bucket, ses:SendEmail (scoped to the verified identity) and sns:Publish (scoped to the alerts topic) when notifications are wired."
   policy      = data.aws_iam_policy_document.consumer[0].json
   tags        = var.tags
 }
