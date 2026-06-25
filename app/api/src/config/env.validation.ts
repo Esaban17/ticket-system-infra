@@ -31,6 +31,17 @@ export const envSchema = z.object({
   // from the Terraform module.async.queue_url output).
   SQS_QUEUE_URL: z.string().url().optional(),
 
+  // SES — remitente verificado para los correos de notificación (BL-035).
+  // Debe pertenecer a una identidad SES verificada (dominio quattro.com.gt).
+  // Inyectado por el ConfigMap; opcional en local.
+  SES_FROM_ADDRESS: z.string().email().optional(),
+
+  // SNS — topic de alertas operativas (consumer + alarmas CloudWatch).
+  // Inyectado por el ConfigMap desde el output del módulo observability.
+  SNS_ALERTS_TOPIC_ARN: z.string().optional(),
+  // Nº de entregas SQS tras el cual el consumer alerta a SNS antes de la DLQ.
+  SNS_ALERT_AFTER_RECEIVES: z.coerce.number().int().positive().default(3),
+
   // SLA (minutos)
   SLA_CRITICAL_MINUTES: z.coerce.number().int().positive().default(60),
   SLA_HIGH_MINUTES: z.coerce.number().int().positive().default(240),

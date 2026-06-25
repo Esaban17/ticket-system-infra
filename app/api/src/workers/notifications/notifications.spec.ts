@@ -5,6 +5,10 @@ import { renderEmail, renderSlack } from './templates/templates';
 import { parseMessage, NotificationMessage } from './notification-message';
 import { NotificationsService } from './notifications.service';
 import { DispatchService } from './dispatch.service';
+import { sendEmailViaSes } from './ses-mailer';
+
+// El envío real por SES se mockea: estas pruebas validan el cableado, no la red.
+jest.mock('./ses-mailer');
 
 const baseUser = {
   notifyEmail: true,
@@ -91,10 +95,24 @@ describe('NotificationsService.process', () => {
   });
 });
 
-describe('DispatchService (stub BL-035)', () => {
-  it('sendEmail/sendSlack resuelven sin lanzar', async () => {
+describe('DispatchService (SES real, BL-035)', () => {
+  beforeEach(() => (sendEmailViaSes as jest.Mock).mockReset());
+
+  it('sendEmail delega en el mailer SES con el contenido renderizado', async () => {
+    (sendEmailViaSes as jest.Mock).mockResolvedValue('ses-msg-1');
     const d = new DispatchService();
     await expect(d.sendEmail('a@b.c', { subject: 's', body: 'b' })).resolves.toBeUndefined();
+    expect(sendEmailViaSes).toHaveBeenCalledWith({ to: 'a@b.c', subject: 's', text: 'b' });
+  });
+
+  it('sendEmail propaga el error de SES (para reintento del worker)', async () => {
+    (sendEmailViaSes as jest.Mock).mockRejectedValue(new Error('Throttling'));
+    const d = new DispatchService();
+    await expect(d.sendEmail('a@b.c', { subject: 's', body: 'b' })).rejects.toThrow('Throttling');
+  });
+
+  it('sendSlack sigue siendo stub y resuelve sin lanzar', async () => {
+    const d = new DispatchService();
     await expect(d.sendSlack('U1', { text: 't' })).resolves.toBeUndefined();
   });
 });
