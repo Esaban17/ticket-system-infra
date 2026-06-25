@@ -82,8 +82,11 @@ monthly_budget_usd = 300
 notification_email = "estuardo1314@gmail.com"
 
 # Image tags — pinned to the images currently running in the cluster.
-# 6b2bc63 = merge de #77 (Cognito + adjuntos + todo lo previo), desplegado el
-# 2026-06-23. Mantener el pin sincronizado con el último deploy evita que un
-# terraform-apply revierta el API/web a una imagen vieja (regresión de Cognito).
-api_image_tag = "6b2bc63"
-web_image_tag = "6b2bc63"
+# 0aa0037 = merge de #97 (delivery-5: SES/SNS, observabilidad), construido por
+# api-deploy/web-deploy el 2026-06-24 y presente en ambos repos ECR. El pin
+# anterior (6b2bc63, merge de #77) ya no existe en ECR: dejaba el Deployment del
+# consumer en ImagePullBackOff (no drenaba la cola, sin envío SES). Mantener el
+# pin sincronizado con el último deploy evita que terraform-apply revierta a una
+# imagen vieja o inexistente.
+api_image_tag = "0aa0037"
+web_image_tag = "0aa0037"
