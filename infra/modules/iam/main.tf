@@ -265,12 +265,16 @@ data "aws_iam_policy_document" "app_s3" {
     }
   }
 
+  # kms:Decrypt unwraps the DB-credentials secret; kms:GenerateDataKey is REQUIRED
+  # because the attachments bucket is SSE-KMS: el API firma URLs prefirmadas de
+  # PutObject y S3 genera la data key BAJO la identidad del firmante, así que sin
+  # GenerateDataKey el PUT del navegador falla con 403 (mismo grant que el Lambda).
   dynamic "statement" {
     for_each = var.secrets_access_enabled ? [1] : []
     content {
       sid       = "AllowDecryptWithCmk"
       effect    = "Allow"
-      actions   = ["kms:Decrypt", "kms:DescribeKey"]
+      actions   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
       resources = [var.kms_key_arn]
     }
   }
@@ -314,6 +318,20 @@ data "aws_iam_policy_document" "consumer" {
     effect    = "Allow"
     actions   = ["s3:PutObject"]
     resources = ["${var.bucket_arn}/*"]
+  }
+
+  # El bucket de adjuntos es SSE-KMS, así que el s3:PutObject del consumer (objetos
+  # async `async/<id>`) necesita generar la data key con la CMK. Sin esto, el PUT
+  # falla con 403 y el mensaje acaba en la DLQ. Mismo grant que app/Lambda; gated
+  # en el bool estático para que el for_each sea resoluble en plan-time.
+  dynamic "statement" {
+    for_each = var.secrets_access_enabled ? [1] : []
+    content {
+      sid       = "AllowConsumerUseCmkForS3"
+      effect    = "Allow"
+      actions   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
+      resources = [var.kms_key_arn]
+    }
   }
 
   # EP-12 / BL-119: el consumer es quien DESPACHA el correo (procesa el mensaje
