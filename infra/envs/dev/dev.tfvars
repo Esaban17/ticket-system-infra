@@ -85,10 +85,10 @@ monthly_budget_usd = 300
 notification_email = "estuardo1314@gmail.com"
 
 # Image tags — pinned to the images currently running in the cluster.
-# 93fd3ea = HEAD de main (merge de #102) reconstruido por api-deploy/web-deploy
-# durante el rebuild cold-start del 2026-06-25 (el ECR se había vaciado en el
-# teardown, así que las imágenes se reconstruyen). Mantener el pin sincronizado
-# con el último deploy evita que terraform-apply revierta a una imagen vieja o
-# inexistente (causa de ImagePullBackOff).
-api_image_tag = "93fd3ea"
-web_image_tag = "93fd3ea"
+# 1b4fd11 = HEAD de main reconstruido por api-deploy/web-deploy durante el
+# rebuild cold-start del 2026-06-25 (el ECR se vacía en cada teardown, así que
+# las imágenes se reconstruyen). Mantener el pin sincronizado con el último
+# deploy evita que terraform-apply revierta a una imagen vieja o inexistente
+# (causa de ImagePullBackOff).
+api_image_tag = "1b4fd11"
+web_image_tag = "1b4fd11"
