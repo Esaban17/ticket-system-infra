@@ -14,16 +14,6 @@ output "scheduler_role_arn" {
   value       = aws_iam_role.scheduler.arn
 }
 
-output "ci_runner_role_arn" {
-  description = "ARN of the GitHub Actions OIDC CI runner role (PowerUserAccess + prefix-scoped iam:*). Re-exposed at the root for Deliverable C (GitHub Actions role-to-assume)."
-  value       = aws_iam_role.ci_runner.arn
-}
-
-output "github_oidc_provider_arn" {
-  description = "ARN of the GitHub Actions OIDC identity provider (account-global, referenced via data source — see main.tf). Re-exposed at the root for Deliverable C."
-  value       = data.aws_iam_openid_connect_provider.github.arn
-}
-
 output "app_policy_arn" {
   description = "ARN of the app (producer/API) IAM policy (S3 + scoped SQS SendMessage). Consumed by the ingress module's app IRSA role_policy_arns."
   value       = aws_iam_policy.app_s3.arn

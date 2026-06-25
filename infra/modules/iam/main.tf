@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # Centralized IAM module (Delivery 5 — Deliverable A).
 #
-# Single home for the four project IAM roles + the application/consumer
+# Single home for the project's runtime IAM roles + the application/consumer
 # policies, so every privilege grant is reviewable in one place and every
 # ARN is exported as an output consumed by the functional modules:
 #
@@ -11,14 +11,17 @@
 #   2. scheduler    — EventBridge Scheduler role: lambda:InvokeFunction on the
 #                     ONE target Lambda (ARN composed by name to avoid a cycle
 #                     with the compute module).
-#   3. ci_runner    — GitHub Actions OIDC role: PowerUserAccess (managed) +
-#                     a prefix-scoped iam:* inline policy (no Resource="*").
-#   4. (policies)   — app_s3 + consumer policies consumed by the ingress IRSA
+#   3. (policies)   — app_s3 + consumer policies consumed by the ingress IRSA
 #                     roles (the IRSA trust/roles stay in the ingress module).
 #
+# NOTE: the CI runner role (GitHub Actions OIDC) is intentionally NOT here — it
+# lives in infra/bootstrap so it SURVIVES `terraform destroy` of this stack (a
+# main-stack-owned CI role deletes its own credentials mid-destroy; incident
+# 2026-06-25). The bootstrap is applied once and is never destroyed.
+#
 # Rubric: NO Action="*" and NO Resource="*" in any policy document we author.
-# The only wildcards are the AWS-managed policies (PowerUserAccess,
-# AWSLambdaVPCAccessExecutionRole) which we attach but do not author.
+# The only wildcard is the AWS-managed AWSLambdaVPCAccessExecutionRole we attach
+# but do not author.
 # ---------------------------------------------------------------------------
 
 data "aws_caller_identity" "current" {}
@@ -37,26 +40,6 @@ locals {
   # and iam needs the Lambda ARN for the scheduler policy. Composing the ARN
   # from the (deterministic) function name lets iam run first.
   target_lambda_arn = "arn:aws:lambda:${local.region}:${local.account_id}:function:${var.function_name}"
-
-  # Scoped IAM resource ARNs the CI runner may manage (no Resource="*"). Besides
-  # the project's own prefix, the terraform-aws-modules/eks community module
-  # creates IAM with NON-project names: the managed node group role
-  # (default-eks-node-group-*), node-group instance profiles, and the cluster's
-  # own OIDC provider (oidc.eks.<region>.amazonaws.com/...). Those patterns are
-  # listed explicitly so the CI apply works WITHOUT granting iam:* on "*".
-  ci_iam_role_arns = [
-    "arn:aws:iam::${local.account_id}:role/${var.name_prefix}-*",
-    "arn:aws:iam::${local.account_id}:role/default-eks-node-group-*",
-  ]
-  ci_iam_policy_arns = [
-    "arn:aws:iam::${local.account_id}:policy/${var.name_prefix}-*",
-  ]
-  ci_iam_instance_profile_arns = [
-    "arn:aws:iam::${local.account_id}:instance-profile/${var.name_prefix}-*",
-    "arn:aws:iam::${local.account_id}:instance-profile/default-eks-node-group-*",
-    "arn:aws:iam::${local.account_id}:instance-profile/eks-*",
-  ]
-  ci_eks_oidc_provider_arn = "arn:aws:iam::${local.account_id}:oidc-provider/oidc.eks.${local.region}.amazonaws.com/*"
 }
 
 # ===========================================================================
@@ -353,166 +336,4 @@ resource "aws_iam_policy" "consumer" {
   description = "Least-privilege SQS + S3 access for the ticket-system async consumer pods (ReceiveMessage/DeleteMessage/GetQueueAttributes on async queue; PutObject on attachments bucket)."
   policy      = data.aws_iam_policy_document.consumer.json
   tags        = var.tags
-}
-
-# ===========================================================================
-# 4. GitHub Actions OIDC provider + CI runner role (prepared for Deliverable C)
-# ===========================================================================
-
-# The GitHub Actions OIDC provider is ACCOUNT-GLOBAL (AWS allows exactly one per
-# URL) and already exists in this account, shared with another project
-# (rubik-frontend-gh-actions trusts it). We therefore REFERENCE it via a data
-# source instead of creating/owning it: owning it would (a) collide on apply
-# (EntityAlreadyExists) and (b) destroy a sibling project's CI federation on our
-# Deliverable-F teardown. The federation is still fully provisioned-as-code — the
-# trust is established by the ci_runner role's assume_role_policy below. See
-# docs/iac-coverage.md for the rationale.
-data "aws_iam_openid_connect_provider" "github" {
-  # By ARN, NOT url: a url-lookup calls iam:ListOpenIDConnectProviders (account-
-  # wide, oidc-provider/*) which the CI runner lacks — and that read happens at
-  # PLAN time, before any apply could widen the policy (chicken-and-egg). An
-  # ARN-lookup uses iam:GetOpenIDConnectProvider, which the runner DOES have on
-  # this exact ARN. The GitHub provider ARN is deterministic for the account.
-  arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
-}
-
-# Trust policy: federated to the GitHub OIDC provider, locked to the specific
-# repo + branch ref (aud = sts.amazonaws.com, sub = repo:org/repo:ref:branch).
-data "aws_iam_policy_document" "ci_runner_assume_role" {
-  statement {
-    sid     = "AllowGitHubActionsToAssume"
-    effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
-
-    principals {
-      type        = "Federated"
-      identifiers = [data.aws_iam_openid_connect_provider.github.arn]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "token.actions.githubusercontent.com:aud"
-      values   = ["sts.amazonaws.com"]
-    }
-
-    # Push-to-main jobs present sub = repo:org/repo:ref:refs/heads/main. But jobs
-    # that target a GitHub Environment (apply-dev/apply-staging) present
-    # sub = repo:org/repo:environment:<env> INSTEAD of the ref. Allow both — a
-    # LIST of EXACT subjects scoped to this repo + main branch + the named
-    # environments (NOT a wildcard; a PR/fork/other-branch still cannot assume).
-    condition {
-      test     = "StringEquals"
-      variable = "token.actions.githubusercontent.com:sub"
-      values = concat(
-        ["repo:${var.github_org}/${var.github_repo}:ref:${var.github_branch_ref}"],
-        [for env in var.github_environments : "repo:${var.github_org}/${var.github_repo}:environment:${env}"],
-      )
-    }
-  }
-}
-
-resource "aws_iam_role" "ci_runner" {
-  name               = "${var.name_prefix}-ci-runner-role"
-  assume_role_policy = data.aws_iam_policy_document.ci_runner_assume_role.json
-  description        = "GitHub Actions OIDC role used by CI to run terraform plan/apply for ${var.github_org}/${var.github_repo} (${var.github_branch_ref})."
-  tags               = var.tags
-}
-
-# AdministratorAccess (AWS-managed) for the CI APPLY identity only. The runner
-# provisions the entire stack — including IAM resources the terraform-aws-modules
-# EKS module creates with non-deterministic names and the cluster OIDC provider —
-# so precisely scoping its IAM is impractical without repeated apply failures.
-# This broad grant is the documented trade-off (delivery-5-summary.md) and is
-# confined to the CI identity: every APPLICATION workload role (lambda_exec,
-# scheduler, app, consumer) stays strictly least-privilege with NO wildcards.
-# The prefix-scoped ci_runner_iam policy below is retained as documentary intent.
-resource "aws_iam_role_policy_attachment" "ci_runner_poweruser" {
-  role       = aws_iam_role.ci_runner.name
-  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
-}
-
-# IAM permissions the CI runner needs to manage THIS project's roles/policies/
-# OIDC provider, scoped by name prefix + the OIDC provider ARN. No Resource="*".
-data "aws_iam_policy_document" "ci_runner_iam" {
-  statement {
-    sid    = "ManageProjectIamRolesAndPolicies"
-    effect = "Allow"
-    actions = [
-      "iam:GetRole",
-      "iam:CreateRole",
-      "iam:DeleteRole",
-      "iam:UpdateRole",
-      "iam:UpdateRoleDescription",
-      "iam:TagRole",
-      "iam:UntagRole",
-      "iam:ListRoleTags",
-      "iam:PassRole",
-      "iam:GetRolePolicy",
-      "iam:PutRolePolicy",
-      "iam:DeleteRolePolicy",
-      "iam:ListRolePolicies",
-      "iam:ListAttachedRolePolicies",
-      "iam:AttachRolePolicy",
-      "iam:DetachRolePolicy",
-      "iam:GetPolicy",
-      "iam:GetPolicyVersion",
-      "iam:CreatePolicy",
-      "iam:DeletePolicy",
-      "iam:CreatePolicyVersion",
-      "iam:DeletePolicyVersion",
-      "iam:ListPolicyVersions",
-      "iam:TagPolicy",
-      "iam:UntagPolicy",
-      "iam:ListInstanceProfilesForRole",
-      "iam:CreateInstanceProfile",
-      "iam:GetInstanceProfile",
-      "iam:DeleteInstanceProfile",
-      "iam:AddRoleToInstanceProfile",
-      "iam:RemoveRoleFromInstanceProfile",
-      "iam:TagInstanceProfile",
-      "iam:UntagInstanceProfile",
-    ]
-    resources = concat(
-      local.ci_iam_role_arns,
-      local.ci_iam_policy_arns,
-      local.ci_iam_instance_profile_arns,
-    )
-  }
-
-  # The EKS module provisions the CLUSTER's own OIDC provider (used for IRSA),
-  # distinct from the GitHub Actions provider. Scoped to the EKS issuer host.
-  statement {
-    sid    = "ManageEksClusterOidcProvider"
-    effect = "Allow"
-    actions = [
-      "iam:CreateOpenIDConnectProvider",
-      "iam:DeleteOpenIDConnectProvider",
-      "iam:TagOpenIDConnectProvider",
-      "iam:UntagOpenIDConnectProvider",
-      "iam:UpdateOpenIDConnectProviderThumbprint",
-      "iam:AddClientIDToOpenIDConnectProvider",
-    ]
-    resources = [local.ci_eks_oidc_provider_arn]
-  }
-
-  # Read access to OIDC providers (the GitHub provider data source lookup + the
-  # EKS provider). GetOpenIDConnectProvider is not resource-scopable to a useful
-  # narrower set across both providers, so it is granted on the two ARNs.
-  statement {
-    sid    = "ReadOidcProviders"
-    effect = "Allow"
-    actions = [
-      "iam:GetOpenIDConnectProvider",
-    ]
-    resources = [
-      data.aws_iam_openid_connect_provider.github.arn,
-      local.ci_eks_oidc_provider_arn,
-    ]
-  }
-}
-
-resource "aws_iam_role_policy" "ci_runner_iam" {
-  name   = "${var.name_prefix}-ci-runner-iam"
-  role   = aws_iam_role.ci_runner.id
-  policy = data.aws_iam_policy_document.ci_runner_iam.json
 }

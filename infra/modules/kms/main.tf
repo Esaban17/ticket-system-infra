@@ -51,6 +51,11 @@ data "aws_iam_policy_document" "key" {
       "kms:UntagResource",
       "kms:ScheduleKeyDeletion",
       "kms:CancelKeyDeletion",
+      # DeleteAlias is REQUIRED so `terraform destroy` can remove the
+      # aws_kms_alias; without it the teardown fails on the alias and leaves it
+      # behind, which then collides ("alias already exists") on the next apply
+      # (incident 2026-06-25). Create*/Update* already cover alias create/update.
+      "kms:DeleteAlias",
     ]
 
     resources = ["*"]
