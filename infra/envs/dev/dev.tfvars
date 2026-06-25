@@ -73,7 +73,10 @@ scheduler_expression = "rate(1 day)"
 scheduler_timezone   = "UTC"
 
 # Observability — Delivery 5, Deliverable E
-alert_email        = "ops@nextcodegt.com"
+# Destinatario de las alertas SNS (alarmas CloudWatch). ops@nextcodegt.com NO es
+# un buzón válido (nextcodegt.com se usa para la app, no para correo), así que su
+# suscripción quedaba pendiente para siempre. Se apunta al correo del responsable.
+alert_email        = "estuardo1314@gmail.com"
 monthly_budget_usd = 300
 
 # Notificaciones por email (EP-12 / BL-119) — identidad de email verificada en
