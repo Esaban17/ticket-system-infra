@@ -85,11 +85,10 @@ monthly_budget_usd = 300
 notification_email = "estuardo1314@gmail.com"
 
 # Image tags — pinned to the images currently running in the cluster.
-# 0aa0037 = merge de #97 (delivery-5: SES/SNS, observabilidad), construido por
-# api-deploy/web-deploy el 2026-06-24 y presente en ambos repos ECR. El pin
-# anterior (6b2bc63, merge de #77) ya no existe en ECR: dejaba el Deployment del
-# consumer en ImagePullBackOff (no drenaba la cola, sin envío SES). Mantener el
-# pin sincronizado con el último deploy evita que terraform-apply revierta a una
-# imagen vieja o inexistente.
-api_image_tag = "0aa0037"
-web_image_tag = "0aa0037"
+# 93fd3ea = HEAD de main (merge de #102) reconstruido por api-deploy/web-deploy
+# durante el rebuild cold-start del 2026-06-25 (el ECR se había vaciado en el
+# teardown, así que las imágenes se reconstruyen). Mantener el pin sincronizado
+# con el último deploy evita que terraform-apply revierta a una imagen vieja o
+# inexistente (causa de ImagePullBackOff).
+api_image_tag = "93fd3ea"
+web_image_tag = "93fd3ea"
