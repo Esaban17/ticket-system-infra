@@ -199,17 +199,11 @@ output "consumer_role_arn" {
   value       = module.ingress.consumer_role_arn
 }
 
-# ---- IAM (Delivery 5 — Deliverable A / prereq for C) -----------------------
-
-output "ci_runner_role_arn" {
-  description = "ARN of the GitHub Actions OIDC CI runner role (PowerUserAccess + prefix-scoped iam:*). Consumed by Deliverable C as the role-to-assume in the GitHub Actions workflow (aws-actions/configure-aws-credentials)."
-  value       = module.iam.ci_runner_role_arn
-}
-
-output "github_oidc_provider_arn" {
-  description = "ARN of the GitHub Actions OIDC identity provider. Consumed by Deliverable C and useful when adding further OIDC-federated roles."
-  value       = module.iam.github_oidc_provider_arn
-}
+# ---- IAM / CI runner -------------------------------------------------------
+# The CI runner role + GitHub OIDC trust now live in infra/bootstrap (so they
+# survive `terraform destroy` of this stack). Get the role ARN from the
+# bootstrap output `ci_runner_role_arn` (it feeds the CI_RUNNER_ROLE_ARN repo
+# variable). It is intentionally no longer a root output of this workspace.
 
 # ---- TLS / dominio (subdominio HTTPS) -------------------------------------
 

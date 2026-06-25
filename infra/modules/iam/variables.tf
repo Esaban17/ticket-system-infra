@@ -70,32 +70,8 @@ variable "ses_identity_arn" {
   default     = ""
 }
 
-variable "github_org" {
-  description = "GitHub organization/owner that owns the repository allowed to assume the CI runner role via OIDC. Used in the trust policy sub condition (repo:<org>/<repo>:ref:<branch_ref>). MUST be the repo's CURRENT owner as it appears in the GitHub Actions OIDC token sub claim — the 'gitcombo' remote URL is a redirect to the renamed owner 'Esaban17', and OIDC emits the current name."
-  type        = string
-  default     = "Esaban17"
-}
-
-variable "github_repo" {
-  description = "GitHub repository name allowed to assume the CI runner role via OIDC. Used in the trust policy sub condition."
-  type        = string
-  default     = "ticket-system-infra"
-}
-
-variable "github_branch_ref" {
-  description = "Git ref (e.g. 'refs/heads/main') the CI runner OIDC trust is locked to. Combined as repo:<org>/<repo>:ref:<branch_ref> in the StringEquals sub condition so only that branch can assume the role."
-  type        = string
-  default     = "refs/heads/main"
-}
-
-variable "github_environments" {
-  description = "GitHub Actions Environments whose jobs may assume the CI runner role. Jobs that target an Environment present an OIDC sub of repo:<org>/<repo>:environment:<env> INSTEAD of the branch ref, so each must be allowed explicitly (still scoped — not a wildcard). The two-phase apply uses dev (auto) and staging (gated)."
-  type        = list(string)
-  default     = ["dev", "staging"]
-}
-
 variable "tags" {
-  description = "Tags applied to the IAM roles, policies and the OIDC provider created by this module."
+  description = "Tags applied to the IAM roles and policies created by this module."
   type        = map(string)
   default     = {}
 }

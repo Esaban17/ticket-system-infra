@@ -12,3 +12,13 @@ output "region" {
   description = "AWS region of the state backend. Copy into infra/backend.tf."
   value       = var.region
 }
+
+output "ci_runner_role_arn" {
+  description = "ARN of the GitHub Actions OIDC CI runner role. Set this as the CI_RUNNER_ROLE_ARN GitHub Actions repo variable consumed by the apply/destroy/deploy workflows."
+  value       = aws_iam_role.ci_runner.arn
+}
+
+output "github_oidc_provider_arn" {
+  description = "ARN of the account-global GitHub Actions OIDC identity provider (referenced, not owned)."
+  value       = data.aws_iam_openid_connect_provider.github.arn
+}
