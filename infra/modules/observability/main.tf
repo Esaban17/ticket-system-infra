@@ -220,8 +220,13 @@ resource "aws_cloudwatch_dashboard" "main" {
           view   = "timeSeries"
           stat   = "Sum"
           period = var.alarm_period_seconds
-          metrics = [
+          # When the ALB ARN suffix is known, scope to that load balancer; else
+          # fall back to the account/region aggregate. Avoids an empty/null
+          # dimension VALUE, which CloudWatch rejects ("only String type allowed").
+          metrics = var.alb_arn_suffix != "" ? [
             ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", var.alb_arn_suffix],
+            ] : [
+            ["AWS/ApplicationELB", "RequestCount"],
           ]
         }
       },

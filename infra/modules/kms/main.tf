@@ -148,6 +148,36 @@ data "aws_iam_policy_document" "key" {
       ]
     }
   }
+
+  # (e) CloudWatch Logs service — encrypt/decrypt log group data with this CMK.
+  # CloudWatch Logs uses its OWN service principal (not kms:ViaService), so it
+  # needs an explicit grant, scoped by the kms:EncryptionContext to log group
+  # ARNs in THIS account/region (the documented CloudWatch-Logs-with-CMK pattern).
+  statement {
+    sid    = "AllowCloudWatchLogs"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["logs.${data.aws_region.current.name}.amazonaws.com"]
+    }
+
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey",
+    ]
+
+    resources = ["*"]
+
+    condition {
+      test     = "ArnLike"
+      variable = "kms:EncryptionContext:aws:logs:arn"
+      values   = ["arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:*"]
+    }
+  }
 }
 
 resource "aws_kms_key" "main" {

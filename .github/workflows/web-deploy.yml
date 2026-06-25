@@ -18,6 +18,7 @@ on:
     paths:
       - "app/web/**"
       - ".github/workflows/web-deploy.yml"
+  workflow_dispatch:
 
 concurrency:
   group: terraform-apply-dev
