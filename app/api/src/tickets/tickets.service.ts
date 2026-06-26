@@ -30,6 +30,7 @@ import { ChangeStateDto } from './dto/change-state.dto';
 import { ListTicketsQuery, ListEventsQuery } from './dto/list-tickets.query';
 import { calculatePriority } from './priority';
 import { canTransition } from './state-machine';
+import { computeSlaFields, SlaStatus } from './sla-status';
 
 const IDEMPOTENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_LIMIT = 20;
@@ -52,6 +53,9 @@ export interface TicketAttachmentRef {
 
 export type TicketWithAttachments = Ticket & {
   attachments: TicketAttachmentRef[];
+  // Derivados de slaDueAt al momento del request (ver sla-status.ts).
+  slaStatus: SlaStatus | null;
+  slaOffByDays: number | null;
 };
 
 @Injectable()
@@ -275,6 +279,7 @@ export class TicketsService {
         id: a.id,
         filename: a.originalFilename,
       })),
+      ...computeSlaFields(rest.slaDueAt, new Date()),
     };
   }
 

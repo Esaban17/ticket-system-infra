@@ -48,6 +48,15 @@ function SlaStatus({ ticket }: { ticket: Ticket }) {
   );
 }
 
+/** Texto legible del `slaOffByDays` derivado en el servidor (+ vencido, − faltan). */
+function slaOffByDaysLabel(days: number | null): string {
+  if (days === null) return '—';
+  if (days === 0) return 'vence hoy';
+  if (days > 0) return `vencido por ${days} día${days === 1 ? '' : 's'}`;
+  const n = -days;
+  return `faltan ${n} día${n === 1 ? '' : 's'}`;
+}
+
 /** TAB Detalle: descripción, resolución (si aplica), panel SLA y acciones. */
 export function DetailTab({
   ticket,
@@ -116,6 +125,30 @@ export function DetailTab({
               <dt className="text-slate-500">Vence (slaDueAt)</dt>
               <dd className="text-slate-900">
                 {formatDateTime(ticket.slaDueAt)}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <dt className="text-slate-500">Estado SLA (servidor)</dt>
+              <dd>
+                {ticket.slaStatus === null ? (
+                  <span className="text-sm text-slate-500">—</span>
+                ) : (
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold border ${
+                      ticket.slaStatus === 'vencido'
+                        ? 'bg-red-50 text-red-700 border-red-200'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    }`}
+                  >
+                    {ticket.slaStatus === 'vencido' ? 'vencido' : 'a tiempo'}
+                  </span>
+                )}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <dt className="text-slate-500">Desfase SLA</dt>
+              <dd className="text-sm font-medium text-slate-900">
+                {slaOffByDaysLabel(ticket.slaOffByDays)}
               </dd>
             </div>
             <div className="flex items-center justify-between gap-2">
