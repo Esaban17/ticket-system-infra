@@ -51,6 +51,8 @@ export interface Ticket {
   assigneeId: string | null;
   escalationLevel: number; // 0..3
   slaDueAt: string; // ISO8601
+  slaStatus: 'a_tiempo' | 'vencido' | null; // derivado en el servidor (GET /v1/tickets/:id)
+  slaOffByDays: number | null; // días con signo: + vencido, − faltan, 0 hoy, null sin SLA
   rootCause: string | null;
   solution: string | null;
   resolvedAt: string | null;
